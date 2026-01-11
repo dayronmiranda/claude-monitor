@@ -96,9 +96,10 @@ func SetSessionName(sessionID, name string) error {
 
 // SessionMessage representa un mensaje individual de una sesión
 type SessionMessage struct {
-	Type      string    `json:"type"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
+	Type      string        `json:"type"`
+	Content   string        `json:"content"`
+	Timestamp time.Time     `json:"timestamp"`
+	Todos     []interface{} `json:"todos,omitempty"`
 }
 
 // DailyActivity actividad diaria
@@ -562,29 +563,38 @@ func extractContentFromMessage(rawContent interface{}) string {
 						}
 					case "thinking":
 						if thinking, ok := itemMap["thinking"].(string); ok {
-							parts = append(parts, "💭 "+thinking)
+							parts = append(parts, "━━━━━ 💭 PENSAMIENTO ━━━━━\n"+thinking+"\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
 						}
 					case "tool_use":
 						if name, ok := itemMap["name"].(string); ok {
 							if input, ok := itemMap["input"].(map[string]interface{}); ok {
 								if cmd, ok := input["command"].(string); ok {
 									parts = append(parts, "🔧 "+name+":\n"+cmd)
+								} else if desc, ok := input["description"].(string); ok {
+									parts = append(parts, "🔧 "+name+":\n"+desc)
 								}
 							}
 						}
 					case "tool_result":
-						if content, ok := itemMap["content"].(string); ok {
-							parts = append(parts, content)
+						content := ""
+						if c, ok := itemMap["content"].(string); ok {
+							content = c
 						}
-						if isError, ok := itemMap["is_error"].(bool); ok && isError {
-							parts = append(parts, "❌ Error")
+						isError := false
+						if ie, ok := itemMap["is_error"].(bool); ok {
+							isError = ie
+						}
+						if isError {
+							parts = append(parts, "❌ RESULTADO (ERROR):\n"+content)
+						} else {
+							parts = append(parts, "✅ RESULTADO:\n"+content)
 						}
 					}
 				}
 			}
 		}
 		if len(parts) > 0 {
-			return strings.Join(parts, "\n")
+			return strings.Join(parts, "\n\n")
 		}
 	}
 	return ""
@@ -629,10 +639,16 @@ func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]Ses
 			}
 		}
 
+		var todos []interface{}
+		if t, ok := msg["todos"].([]interface{}); ok && len(t) > 0 {
+			todos = t
+		}
+
 		messages = append(messages, SessionMessage{
 			Type:      msgType,
 			Content:   content,
 			Timestamp: timestamp,
+			Todos:     todos,
 		})
 	}
 
