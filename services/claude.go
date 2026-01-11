@@ -579,13 +579,21 @@ func extractContentFromMessage(rawContent interface{}) string {
 									if fp, ok := input["file_path"].(string); ok {
 										toolInfo += "Editing: " + fp
 										if oldStr, ok := input["old_string"].(string); ok && len(oldStr) > 0 {
-											toolInfo += "\n\n[OLD CODE]\n" + oldStr[:500]
+											maxLen := 500
+											if len(oldStr) < maxLen {
+												maxLen = len(oldStr)
+											}
+											toolInfo += "\n\n[OLD CODE]\n" + oldStr[:maxLen]
 											if len(oldStr) > 500 {
 												toolInfo += "\n...(truncado)"
 											}
 										}
 										if newStr, ok := input["new_string"].(string); ok && len(newStr) > 0 {
-											toolInfo += "\n\n[NEW CODE]\n" + newStr[:500]
+											maxLen := 500
+											if len(newStr) < maxLen {
+												maxLen = len(newStr)
+											}
+											toolInfo += "\n\n[NEW CODE]\n" + newStr[:maxLen]
 											if len(newStr) > 500 {
 												toolInfo += "\n...(truncado)"
 											}
