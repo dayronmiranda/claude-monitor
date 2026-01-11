@@ -325,6 +325,11 @@ func (s *ClaudeService) ListSessions(projectPath string) ([]ClaudeSession, error
 		session.CreatedAt = createdAt
 		session.Name = GetSessionName(session.ID)
 
+		// Filtrar sesiones vacías o solo con caveats/metadata
+		if msgCount == 0 || strings.HasPrefix(firstMsg, "<local-command-caveat>") || strings.HasPrefix(firstMsg, "Caveat:") {
+			continue
+		}
+
 		sessions = append(sessions, session)
 	}
 
