@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"claude-monitor/services"
@@ -75,6 +76,34 @@ func (h *SessionsHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	messages, err := h.claude.GetSessionMessages(projectPath, sessionID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		return
+	}
+
+	json.NewEncoder(w).Encode(SuccessWithMeta(messages, &APIMeta{Total: len(messages)}))
+}
+
+// GetRealTimeMessages GET /api/projects/{path}/sessions/{id}/messages/realtime?from=N
+func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Request) {
+	projectPath, sessionID := extractSessionMessagesParams(r.URL.Path)
+
+	if projectPath == "" || sessionID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse("project path y session id requeridos"))
+		return
+	}
+
+	// Obtener línea de inicio desde query parameter
+	fromLine := 0
+	if fromStr := r.URL.Query().Get("from"); fromStr != "" {
+		if n, err := strconv.Atoi(fromStr); err == nil && n >= 0 {
+			fromLine = n
+		}
+	}
+
+	messages, err := h.claude.GetSessionMessagesFromLine(projectPath, sessionID, fromLine)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))

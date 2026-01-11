@@ -642,6 +642,71 @@ func extractContentFromMessage(rawContent interface{}) string {
 	return ""
 }
 
+// GetSessionMessagesFromLine obtiene mensajes desde una línea específica (para monitoreo en tiempo real)
+func (s *ClaudeService) GetSessionMessagesFromLine(projectPath, sessionID string, fromLine int) ([]SessionMessage, error) {
+	filePath := filepath.Join(s.claudeDir, projectPath, sessionID+".jsonl")
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var messages []SessionMessage
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	lineNum := 0
+	for scanner.Scan() {
+		if lineNum < fromLine {
+			lineNum++
+			continue
+		}
+
+		line := scanner.Text()
+		var msg map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			lineNum++
+			continue
+		}
+
+		msgType, ok := msg["type"].(string)
+		if !ok || (msgType != "user" && msgType != "assistant") {
+			lineNum++
+			continue
+		}
+
+		var content string
+		if message, ok := msg["message"].(map[string]interface{}); ok {
+			content = extractContentFromMessage(message["content"])
+		}
+
+		var timestamp time.Time
+		if ts, ok := msg["timestamp"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, ts); err == nil {
+				timestamp = t
+			}
+		}
+
+		var todos []interface{}
+		if t, ok := msg["todos"].([]interface{}); ok && len(t) > 0 {
+			todos = t
+		}
+
+		messages = append(messages, SessionMessage{
+			Type:      msgType,
+			Content:   content,
+			Timestamp: timestamp,
+			Todos:     todos,
+		})
+
+		lineNum++
+	}
+
+	return messages, nil
+}
+
 // GetSessionMessages obtiene todos los mensajes de una sesión
 func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]SessionMessage, error) {
 	filePath := filepath.Join(s.claudeDir, projectPath, sessionID+".jsonl")

@@ -134,6 +134,12 @@ func (r *Router) routeSessions(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// GET /api/projects/{path}/sessions/{id}/messages/realtime
+	if strings.HasSuffix(path, "/messages/realtime") && req.Method == http.MethodGet {
+		r.sessions.GetRealTimeMessages(w, req)
+		return
+	}
+
 	// GET /api/projects/{path}/sessions/{id}/messages
 	if strings.HasSuffix(path, "/messages") && req.Method == http.MethodGet {
 		r.sessions.GetMessages(w, req)
