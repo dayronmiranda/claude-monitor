@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -642,6 +643,15 @@ func extractContentFromMessage(rawContent interface{}) string {
 	return ""
 }
 
+// getMapKeys retorna las claves de un mapa como string para logging
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // GetSessionMessagesFromLine obtiene mensajes desde una línea específica (para monitoreo en tiempo real)
 func (s *ClaudeService) GetSessionMessagesFromLine(projectPath, sessionID string, fromLine int) ([]SessionMessage, error) {
 	filePath := filepath.Join(s.claudeDir, projectPath, sessionID+".jsonl")
@@ -667,12 +677,15 @@ func (s *ClaudeService) GetSessionMessagesFromLine(projectPath, sessionID string
 		line := scanner.Text()
 		var msg map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Printf("[GetSessionMessagesFromLine] Error unmarshal línea %d: %v\n", lineNum, err)
 			lineNum++
 			continue
 		}
 
+		log.Printf("[GetSessionMessagesFromLine] Línea %d - JSON keys: %v\n", lineNum, getMapKeys(msg))
 		msgType, ok := msg["type"].(string)
 		if !ok || (msgType != "user" && msgType != "assistant") {
+			log.Printf("[GetSessionMessagesFromLine] Línea %d - type inválido o no encontrado. ok=%v, msgType=%s\n", lineNum, ok, msgType)
 			lineNum++
 			continue
 		}
@@ -686,7 +699,11 @@ func (s *ClaudeService) GetSessionMessagesFromLine(projectPath, sessionID string
 		if ts, ok := msg["timestamp"].(string); ok {
 			if t, err := time.Parse(time.RFC3339, ts); err == nil {
 				timestamp = t
+			} else {
+				log.Printf("[GetSessionMessagesFromLine] Error parseando timestamp en línea %d: valor='%s', error='%v'\n", lineNum, ts, err)
 			}
+		} else {
+			log.Printf("[GetSessionMessagesFromLine] Timestamp no es string en línea %d, tipo: %T, valor: %v\n", lineNum, msg["timestamp"], msg["timestamp"])
 		}
 
 		var todos []interface{}
@@ -743,7 +760,11 @@ func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]Ses
 		if ts, ok := msg["timestamp"].(string); ok {
 			if t, err := time.Parse(time.RFC3339, ts); err == nil {
 				timestamp = t
+			} else {
+				log.Printf("[GetSessionMessages] Error parseando timestamp: valor='%s', error='%v'\n", ts, err)
 			}
+		} else {
+			log.Printf("[GetSessionMessages] Timestamp no es string, tipo: %T, valor: %v\n", msg["timestamp"], msg["timestamp"])
 		}
 
 		var todos []interface{}
