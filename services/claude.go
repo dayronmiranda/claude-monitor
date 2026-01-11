@@ -539,6 +539,52 @@ func (s *ClaudeService) parseSessionDates(filePath string) map[string]int {
 	return dates
 }
 
+// extractContentFromMessage extrae el contenido de un mensaje (string o array)
+func extractContentFromMessage(rawContent interface{}) string {
+	switch v := rawContent.(type) {
+	case string:
+		return v
+	case []interface{}:
+		var parts []string
+		for _, item := range v {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				// Extraer según el tipo de bloque
+				if itemType, ok := itemMap["type"].(string); ok {
+					switch itemType {
+					case "text":
+						if text, ok := itemMap["text"].(string); ok {
+							parts = append(parts, text)
+						}
+					case "thinking":
+						if thinking, ok := itemMap["thinking"].(string); ok {
+							parts = append(parts, "💭 "+thinking)
+						}
+					case "tool_use":
+						if name, ok := itemMap["name"].(string); ok {
+							if input, ok := itemMap["input"].(map[string]interface{}); ok {
+								if cmd, ok := input["command"].(string); ok {
+									parts = append(parts, "🔧 "+name+":\n"+cmd)
+								}
+							}
+						}
+					case "tool_result":
+						if content, ok := itemMap["content"].(string); ok {
+							parts = append(parts, content)
+						}
+						if isError, ok := itemMap["is_error"].(bool); ok && isError {
+							parts = append(parts, "❌ Error")
+						}
+					}
+				}
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, "\n")
+		}
+	}
+	return ""
+}
+
 // GetSessionMessages obtiene todos los mensajes de una sesión
 func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]SessionMessage, error) {
 	filePath := filepath.Join(s.claudeDir, projectPath, sessionID+".jsonl")
@@ -568,9 +614,7 @@ func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]Ses
 
 		var content string
 		if message, ok := msg["message"].(map[string]interface{}); ok {
-			if c, ok := message["content"].(string); ok {
-				content = c
-			}
+			content = extractContentFromMessage(message["content"])
 		}
 
 		var timestamp time.Time
