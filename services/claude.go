@@ -567,12 +567,46 @@ func extractContentFromMessage(rawContent interface{}) string {
 						}
 					case "tool_use":
 						if name, ok := itemMap["name"].(string); ok {
+							toolInfo := "🔧 " + name + ":\n"
 							if input, ok := itemMap["input"].(map[string]interface{}); ok {
-								if cmd, ok := input["command"].(string); ok {
-									parts = append(parts, "🔧 "+name+":\n"+cmd)
-								} else if desc, ok := input["description"].(string); ok {
-									parts = append(parts, "🔧 "+name+":\n"+desc)
+								// Mostrar diferente según el tipo de herramienta
+								switch name {
+								case "Read":
+									if fp, ok := input["file_path"].(string); ok {
+										toolInfo += "Reading: " + fp
+									}
+								case "Edit":
+									if fp, ok := input["file_path"].(string); ok {
+										toolInfo += "Editing: " + fp
+										if oldStr, ok := input["old_string"].(string); ok && len(oldStr) > 0 {
+											toolInfo += "\n\n[OLD CODE]\n" + oldStr[:500]
+											if len(oldStr) > 500 {
+												toolInfo += "\n...(truncado)"
+											}
+										}
+										if newStr, ok := input["new_string"].(string); ok && len(newStr) > 0 {
+											toolInfo += "\n\n[NEW CODE]\n" + newStr[:500]
+											if len(newStr) > 500 {
+												toolInfo += "\n...(truncado)"
+											}
+										}
+									}
+								case "Write":
+									if fp, ok := input["file_path"].(string); ok {
+										toolInfo += "Creating: " + fp
+									}
+								case "Bash":
+									if cmd, ok := input["command"].(string); ok {
+										toolInfo += cmd
+									} else if desc, ok := input["description"].(string); ok {
+										toolInfo += desc
+									}
+								default:
+									// Para otras herramientas, mostrar todos los inputs como JSON
+									inputJSON, _ := json.Marshal(input)
+									toolInfo += string(inputJSON)
 								}
+								parts = append(parts, toolInfo)
 							}
 						}
 					case "tool_result":
