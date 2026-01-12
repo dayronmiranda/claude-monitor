@@ -28,16 +28,18 @@ type ClaudeProject struct {
 
 // ClaudeSession representa una sesión de Claude
 type ClaudeSession struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name,omitempty"`
-	ProjectPath  string    `json:"project_path"`
-	RealPath     string    `json:"real_path"`
-	FilePath     string    `json:"file_path"`
-	FirstMessage string    `json:"first_message"`
-	MessageCount int       `json:"message_count"`
-	SizeBytes    int64     `json:"size_bytes"`
-	CreatedAt    time.Time `json:"created_at"`
-	ModifiedAt   time.Time `json:"modified_at"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name,omitempty"`
+	ProjectPath       string    `json:"project_path"`
+	RealPath          string    `json:"real_path"`
+	FilePath          string    `json:"file_path"`
+	FirstMessage      string    `json:"first_message"`
+	MessageCount      int       `json:"message_count"`
+	UserMessages      int       `json:"user_messages"`
+	AssistantMessages int       `json:"assistant_messages"`
+	SizeBytes         int64     `json:"size_bytes"`
+	CreatedAt         time.Time `json:"created_at"`
+	ModifiedAt        time.Time `json:"modified_at"`
 }
 
 // SessionNames almacena nombres personalizados de sesiones
@@ -321,14 +323,16 @@ func (s *ClaudeService) ListSessions(projectPath string) ([]ClaudeSession, error
 			session.SizeBytes = info.Size()
 		}
 
-		firstMsg, msgCount, createdAt := s.parseSessionFile(filePath)
+		firstMsg, userCount, assistantCount, createdAt := s.parseSessionFile(filePath)
 		session.FirstMessage = firstMsg
-		session.MessageCount = msgCount
+		session.UserMessages = userCount
+		session.AssistantMessages = assistantCount
+		session.MessageCount = userCount + assistantCount
 		session.CreatedAt = createdAt
 		session.Name = GetSessionName(session.ID)
 
 		// Filtrar sesiones vacías o solo con caveats/metadata
-		if msgCount == 0 || strings.HasPrefix(firstMsg, "<local-command-caveat>") || strings.HasPrefix(firstMsg, "Caveat:") {
+		if session.MessageCount == 0 || strings.HasPrefix(firstMsg, "<local-command-caveat>") || strings.HasPrefix(firstMsg, "Caveat:") {
 			continue
 		}
 
@@ -366,9 +370,11 @@ func (s *ClaudeService) GetSession(projectPath, sessionID string) (*ClaudeSessio
 		SizeBytes:   info.Size(),
 	}
 
-	firstMsg, msgCount, createdAt := s.parseSessionFile(filePath)
+	firstMsg, userCount, assistantCount, createdAt := s.parseSessionFile(filePath)
 	session.FirstMessage = firstMsg
-	session.MessageCount = msgCount
+	session.UserMessages = userCount
+	session.AssistantMessages = assistantCount
+	session.MessageCount = userCount + assistantCount
 	session.CreatedAt = createdAt
 
 	return session, nil
@@ -463,10 +469,10 @@ func (s *ClaudeService) GetProjectActivity(projectPath string) ([]DailyActivity,
 }
 
 // parseSessionFile extrae información de un archivo de sesión
-func (s *ClaudeService) parseSessionFile(filePath string) (firstMessage string, messageCount int, createdAt time.Time) {
+func (s *ClaudeService) parseSessionFile(filePath string) (firstMessage string, userCount int, assistantCount int, createdAt time.Time) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", 0, time.Time{}
+		return "", 0, 0, time.Time{}
 	}
 	defer file.Close()
 
@@ -482,7 +488,7 @@ func (s *ClaudeService) parseSessionFile(filePath string) (firstMessage string, 
 		}
 
 		if msgType, ok := msg["type"].(string); ok && msgType == "user" {
-			messageCount++
+			userCount++
 
 			if ts, ok := msg["timestamp"].(string); ok {
 				if t, err := time.Parse(time.RFC3339, ts); err == nil {
@@ -505,11 +511,11 @@ func (s *ClaudeService) parseSessionFile(filePath string) (firstMessage string, 
 		}
 
 		if msgType, ok := msg["type"].(string); ok && msgType == "assistant" {
-			messageCount++
+			assistantCount++
 		}
 	}
 
-	return firstMessage, messageCount, createdAt
+	return firstMessage, userCount, assistantCount, createdAt
 }
 
 // parseSessionDates extrae las fechas de mensajes
@@ -547,6 +553,7 @@ func (s *ClaudeService) parseSessionDates(filePath string) map[string]int {
 }
 
 // extractContentFromMessage extrae el contenido de un mensaje (string o array)
+// NOTA: No incluye tool_result blocks ya que son resultados internos, no mensajes reales
 func extractContentFromMessage(rawContent interface{}) string {
 	switch v := rawContent.(type) {
 	case string:
@@ -619,19 +626,8 @@ func extractContentFromMessage(rawContent interface{}) string {
 							}
 						}
 					case "tool_result":
-						content := ""
-						if c, ok := itemMap["content"].(string); ok {
-							content = c
-						}
-						isError := false
-						if ie, ok := itemMap["is_error"].(bool); ok {
-							isError = ie
-						}
-						if isError {
-							parts = append(parts, "❌ RESULTADO (ERROR):\n"+content)
-						} else {
-							parts = append(parts, "✅ RESULTADO:\n"+content)
-						}
+						// SKIP: No mostrar tool_result blocks - son resultados internos, no mensajes reales
+						// Los tool_results son intermedios en el proceso y no deben ser mostrados al usuario
 					}
 				}
 			}

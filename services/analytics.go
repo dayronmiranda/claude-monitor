@@ -18,41 +18,47 @@ type AnalyticsService struct {
 
 // GlobalAnalytics estadísticas globales
 type GlobalAnalytics struct {
-	TotalProjects   int               `json:"total_projects"`
-	TotalSessions   int               `json:"total_sessions"`
-	TotalMessages   int               `json:"total_messages"`
-	TotalSizeBytes  int64             `json:"total_size_bytes"`
-	EmptySessions   int               `json:"empty_sessions"`
-	ActiveDays      int               `json:"active_days"`
-	ProjectsSummary []ProjectSummary  `json:"projects_summary"`
-	DailyActivity   []DailyActivity   `json:"daily_activity"`
-	LastUpdated     time.Time         `json:"last_updated"`
-	CachedUntil     time.Time         `json:"cached_until"`
+	TotalProjects         int               `json:"total_projects"`
+	TotalSessions         int               `json:"total_sessions"`
+	TotalMessages         int               `json:"total_messages"`
+	TotalUserMessages     int               `json:"total_user_messages"`
+	TotalAssistantMessages int              `json:"total_assistant_messages"`
+	TotalSizeBytes        int64             `json:"total_size_bytes"`
+	EmptySessions         int               `json:"empty_sessions"`
+	ActiveDays            int               `json:"active_days"`
+	ProjectsSummary       []ProjectSummary  `json:"projects_summary"`
+	DailyActivity         []DailyActivity   `json:"daily_activity"`
+	LastUpdated           time.Time         `json:"last_updated"`
+	CachedUntil           time.Time         `json:"cached_until"`
 }
 
 // ProjectSummary resumen de proyecto
 type ProjectSummary struct {
-	Path          string    `json:"path"`
-	RealPath      string    `json:"real_path"`
-	Sessions      int       `json:"sessions"`
-	Messages      int       `json:"messages"`
-	SizeBytes     int64     `json:"size_bytes"`
-	EmptySessions int       `json:"empty_sessions"`
-	LastActivity  time.Time `json:"last_activity"`
+	Path              string    `json:"path"`
+	RealPath          string    `json:"real_path"`
+	Sessions          int       `json:"sessions"`
+	Messages          int       `json:"messages"`
+	UserMessages      int       `json:"user_messages"`
+	AssistantMessages int       `json:"assistant_messages"`
+	SizeBytes         int64     `json:"size_bytes"`
+	EmptySessions     int       `json:"empty_sessions"`
+	LastActivity      time.Time `json:"last_activity"`
 }
 
 // ProjectAnalytics estadísticas de un proyecto
 type ProjectAnalytics struct {
-	Path           string          `json:"path"`
-	RealPath       string          `json:"real_path"`
-	TotalSessions  int             `json:"total_sessions"`
-	TotalMessages  int             `json:"total_messages"`
-	TotalSizeBytes int64           `json:"total_size_bytes"`
-	EmptySessions  int             `json:"empty_sessions"`
-	DailyActivity  []DailyActivity `json:"daily_activity"`
-	TopDays        []DailyActivity `json:"top_days"`
-	LastUpdated    time.Time       `json:"last_updated"`
-	CachedUntil    time.Time       `json:"cached_until"`
+	Path                  string          `json:"path"`
+	RealPath              string          `json:"real_path"`
+	TotalSessions         int             `json:"total_sessions"`
+	TotalMessages         int             `json:"total_messages"`
+	TotalUserMessages     int             `json:"total_user_messages"`
+	TotalAssistantMessages int            `json:"total_assistant_messages"`
+	TotalSizeBytes        int64           `json:"total_size_bytes"`
+	EmptySessions         int             `json:"empty_sessions"`
+	DailyActivity         []DailyActivity `json:"daily_activity"`
+	TopDays               []DailyActivity `json:"top_days"`
+	LastUpdated           time.Time       `json:"last_updated"`
+	CachedUntil           time.Time       `json:"cached_until"`
 }
 
 // NewAnalyticsService crea una nueva instancia
@@ -105,6 +111,8 @@ func (s *AnalyticsService) GetGlobal(forceRefresh bool) (*GlobalAnalytics, error
 
 		for _, sess := range sessions {
 			summary.Messages += sess.MessageCount
+			summary.UserMessages += sess.UserMessages
+			summary.AssistantMessages += sess.AssistantMessages
 			summary.SizeBytes += sess.SizeBytes
 			if sess.MessageCount == 0 {
 				summary.EmptySessions++
@@ -116,6 +124,8 @@ func (s *AnalyticsService) GetGlobal(forceRefresh bool) (*GlobalAnalytics, error
 
 		global.TotalSessions += summary.Sessions
 		global.TotalMessages += summary.Messages
+		global.TotalUserMessages += summary.UserMessages
+		global.TotalAssistantMessages += summary.AssistantMessages
 		global.TotalSizeBytes += summary.SizeBytes
 		global.EmptySessions += summary.EmptySessions
 		global.ProjectsSummary = append(global.ProjectsSummary, summary)
@@ -171,6 +181,8 @@ func (s *AnalyticsService) GetProject(projectPath string, forceRefresh bool) (*P
 
 	for _, sess := range sessions {
 		analytics.TotalMessages += sess.MessageCount
+		analytics.TotalUserMessages += sess.UserMessages
+		analytics.TotalAssistantMessages += sess.AssistantMessages
 		analytics.TotalSizeBytes += sess.SizeBytes
 		if sess.MessageCount == 0 {
 			analytics.EmptySessions++
