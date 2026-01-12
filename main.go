@@ -93,10 +93,22 @@ func main() {
 		time.Duration(cfg.CacheDurationMinutes)*time.Minute,
 	)
 
+	// Inicializar JobService
+	jobsDir := filepath.Join(dataDir, "jobs")
+	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+		log.Warn("Error creando directorio de jobs", "error", err)
+	}
+	jobService := services.NewJobService()
+	jobService.SetJobsDir(jobsDir)
+	if err := jobService.LoadJobsFromDisk(); err != nil {
+		log.Warn("Error cargando jobs del disco", "error", err)
+	}
+
 	// Crear router
 	router := NewRouter(
 		claudeService,
 		terminalService,
+		jobService,
 		analyticsService,
 		cfg.HostName,
 		Version,

@@ -21,19 +21,24 @@ type JobService struct {
 }
 
 // NewJobService crea una nueva instancia de JobService
-func NewJobService(claudeSvc *ClaudeService, terminalSvc *TerminalService, dataDir string) *JobService {
-	jobsDir := filepath.Join(dataDir, "jobs")
-
-	// Crear directorio si no existe
-	os.MkdirAll(jobsDir, 0755)
-
+func NewJobService() *JobService {
 	return &JobService{
 		activeJobs:  make(map[string]*Job),
 		savedJobs:   make(map[string]*SavedJob),
-		claudeSvc:   claudeSvc,
-		terminalSvc: terminalSvc,
-		jobsDir:     jobsDir,
 	}
+}
+
+// SetJobsDir establece el directorio donde se persisten los jobs
+func (s *JobService) SetJobsDir(jobsDir string) {
+	s.jobsDir = jobsDir
+	// Crear directorio si no existe
+	os.MkdirAll(jobsDir, 0755)
+}
+
+// SetServices establece los servicios que depende JobService
+func (s *JobService) SetServices(claudeSvc *ClaudeService, terminalSvc *TerminalService) {
+	s.claudeSvc = claudeSvc
+	s.terminalSvc = terminalSvc
 }
 
 // Create crea un nuevo job

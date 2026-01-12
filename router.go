@@ -14,6 +14,7 @@ type Router struct {
 	projects  *handlers.ProjectsHandler
 	sessions  *handlers.SessionsHandler
 	terminals *handlers.TerminalsHandler
+	jobs      *handlers.JobsHandler
 	analytics *handlers.AnalyticsHandler
 }
 
@@ -21,6 +22,7 @@ type Router struct {
 func NewRouter(
 	claude *services.ClaudeService,
 	terminals *services.TerminalService,
+	jobs *services.JobService,
 	analytics *services.AnalyticsService,
 	hostName, version, claudeDir string,
 	allowedPathPrefixes []string,
@@ -30,6 +32,7 @@ func NewRouter(
 		projects:  handlers.NewProjectsHandler(claude, analytics),
 		sessions:  handlers.NewSessionsHandler(claude, terminals, analytics),
 		terminals: handlers.NewTerminalsHandler(terminals, allowedPathPrefixes),
+		jobs:      handlers.NewJobsHandler(jobs),
 		analytics: handlers.NewAnalyticsHandler(analytics),
 	}
 }
@@ -44,6 +47,9 @@ func (r *Router) SetupRoutes(mux *http.ServeMux) {
 	// Projects
 	mux.HandleFunc("/api/projects", r.routeProjects)
 	mux.HandleFunc("/api/projects/", r.routeProjectsWithPath)
+
+	// Jobs (unified Sessions + Terminals)
+	handlers.RegisterJobsRoutes(mux, r.jobs)
 
 	// Terminals
 	mux.HandleFunc("/api/terminals", r.routeTerminals)
