@@ -189,26 +189,26 @@ docker run -d \
 | GET | `/api/health` | Health check |
 | GET | `/api/ready` | Readiness check |
 
-#### Proyectos
+#### Session Roots (Directorios con sesiones de Claude)
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/projects` | Listar proyectos |
-| GET | `/api/projects/{path}` | Obtener proyecto |
-| DELETE | `/api/projects/{path}` | Eliminar proyecto |
-| GET | `/api/projects/{path}/activity` | Actividad del proyecto |
+| GET | `/api/session-roots` | Listar session roots |
+| GET | `/api/session-roots/{path}` | Obtener session root |
+| DELETE | `/api/session-roots/{path}` | Eliminar session root |
+| GET | `/api/session-roots/{path}/activity` | Actividad del session root |
 
 #### Sesiones
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/projects/{path}/sessions` | Listar sesiones |
-| GET | `/api/projects/{path}/sessions/{id}` | Obtener sesión |
-| GET | `/api/projects/{path}/sessions/{id}/messages` | Historial de mensajes |
-| GET | `/api/projects/{path}/sessions/{id}/messages/realtime` | Mensajes en tiempo real (SSE) |
-| DELETE | `/api/projects/{path}/sessions/{id}` | Eliminar sesión |
-| PUT | `/api/projects/{path}/sessions/{id}/rename` | Renombrar sesión |
-| POST | `/api/projects/{path}/sessions/delete` | Eliminar múltiples |
-| POST | `/api/projects/{path}/sessions/clean` | Limpiar vacías |
-| POST | `/api/projects/{path}/sessions/import` | Importar sesión |
+| GET | `/api/session-roots/{path}/sessions` | Listar sesiones |
+| GET | `/api/session-roots/{path}/sessions/{id}` | Obtener sesión |
+| GET | `/api/session-roots/{path}/sessions/{id}/messages` | Historial de mensajes |
+| GET | `/api/session-roots/{path}/sessions/{id}/messages/realtime` | Mensajes en tiempo real |
+| DELETE | `/api/session-roots/{path}/sessions/{id}` | Eliminar sesión |
+| PUT | `/api/session-roots/{path}/sessions/{id}/rename` | Renombrar sesión |
+| POST | `/api/session-roots/{path}/sessions/delete` | Eliminar múltiples |
+| POST | `/api/session-roots/{path}/sessions/clean` | Limpiar vacías |
+| POST | `/api/session-roots/{path}/sessions/import` | Importar sesión |
 
 #### Terminales
 | Método | Endpoint | Descripción |
@@ -240,7 +240,7 @@ docker run -d \
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | GET | `/api/analytics/global` | Analytics globales |
-| GET | `/api/analytics/projects/{path}` | Analytics por proyecto |
+| GET | `/api/analytics/session-roots/{path}` | Analytics por session root |
 | POST | `/api/analytics/invalidate` | Invalidar cache |
 | GET | `/api/analytics/cache` | Estado del cache |
 
@@ -402,10 +402,27 @@ Jobs unifica sesiones históricas y terminales activas en una sola vista:
 
 ## Documentación
 
+Toda la documentación se encuentra en el directorio [`docs/`](docs/).
+
 | Documento | Descripción |
 |-----------|-------------|
-| [docs/API.md](docs/API.md) | Documentación completa de la API REST |
-| [docs/CLAUDE_STATE.md](docs/CLAUDE_STATE.md) | Sistema de detección de estados |
+| [docs/README.md](docs/README.md) | Índice de documentación |
+| [docs/openapi.yaml](docs/openapi.yaml) | Especificación OpenAPI 3.0 |
+| [docs/API.md](docs/API.md) | Guía de uso de la API REST |
+| [docs/CLAUDE_STATE.md](docs/CLAUDE_STATE.md) | Sistema de detección de estados y eventos WebSocket |
+| [docs/STATE_MACHINE.md](docs/STATE_MACHINE.md) | Máquina de estados de Jobs |
+| [docs/JOBS_GUIDE.md](docs/JOBS_GUIDE.md) | Guía del sistema de Jobs |
+
+### Ver documentación interactiva
+
+```bash
+# Con Swagger UI
+docker run -p 8081:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/docs:/api swaggerapi/swagger-ui
+
+# Con Redoc
+npx @redocly/cli preview-docs docs/openapi.yaml
+```
 
 ---
 
@@ -445,8 +462,17 @@ claude-monitor/
 │   └── validator/             # Validación de requests
 │
 └── docs/                      # Documentación
+    ├── README.md              # Índice de documentación
+    ├── openapi.yaml           # Especificación OpenAPI 3.0
     ├── API.md                 # API Reference
-    └── CLAUDE_STATE.md        # Claude State Detection
+    ├── CLAUDE_STATE.md        # Claude State Detection
+    ├── STATE_MACHINE.md       # Máquina de estados de Jobs
+    ├── JOBS_GUIDE.md          # Guía del sistema de Jobs
+    ├── IMPLEMENTATION_SUMMARY.md # Resumen de implementación
+    ├── TESTING_CHECKLIST.md   # Checklist de testing
+    ├── MIGRATION_STRATEGY.md  # Estrategia de migración
+    ├── IMPROVEMENT_PLAN.md    # Plan de mejoras
+    └── PROJECT_COMPLETE.md    # Estado del proyecto
 ```
 
 ---
