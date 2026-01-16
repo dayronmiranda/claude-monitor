@@ -24,11 +24,11 @@ func NewSessionsHandler(claude *services.ClaudeService, terminals *services.Term
 	}
 }
 
-// List GET /api/projects/{projectPath}/sessions
+// List GET /api/session-roots/{rootPath}/sessions
 func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
-	path := URLParamDecoded(r, "projectPath")
+	path := URLParamDecoded(r, "rootPath")
 	if path == "" {
-		WriteBadRequest(w, "project path requerido")
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -41,17 +41,17 @@ func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessWithMeta(sessions, &APIMeta{Total: len(sessions)}))
 }
 
-// Get GET /api/projects/{projectPath}/sessions/{sessionID}
+// Get GET /api/session-roots/{rootPath}/sessions/{sessionID}
 func (h *SessionsHandler) Get(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
+	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
 
-	if projectPath == "" || sessionID == "" {
-		WriteBadRequest(w, "project path y session id requeridos")
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
 		return
 	}
 
-	session, err := h.claude.GetSession(projectPath, sessionID)
+	session, err := h.claude.GetSession(rootPath, sessionID)
 	if err != nil {
 		WriteNotFound(w, "sesion")
 		return
@@ -60,17 +60,17 @@ func (h *SessionsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, session)
 }
 
-// GetMessages GET /api/projects/{projectPath}/sessions/{sessionID}/messages
+// GetMessages GET /api/session-roots/{rootPath}/sessions/{sessionID}/messages
 func (h *SessionsHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
+	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
 
-	if projectPath == "" || sessionID == "" {
-		WriteBadRequest(w, "project path y session id requeridos")
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
 		return
 	}
 
-	messages, err := h.claude.GetSessionMessages(projectPath, sessionID)
+	messages, err := h.claude.GetSessionMessages(rootPath, sessionID)
 	if err != nil {
 		WriteNotFound(w, "sesion")
 		return
@@ -79,13 +79,13 @@ func (h *SessionsHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessWithMeta(messages, &APIMeta{Total: len(messages)}))
 }
 
-// GetRealTimeMessages GET /api/projects/{projectPath}/sessions/{sessionID}/messages/realtime?from=N
+// GetRealTimeMessages GET /api/session-roots/{rootPath}/sessions/{sessionID}/messages/realtime?from=N
 func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
+	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
 
-	if projectPath == "" || sessionID == "" {
-		WriteBadRequest(w, "project path y session id requeridos")
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
 		return
 	}
 
@@ -97,7 +97,7 @@ func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	messages, err := h.claude.GetSessionMessagesFromLine(projectPath, sessionID, fromLine)
+	messages, err := h.claude.GetSessionMessagesFromLine(rootPath, sessionID, fromLine)
 	if err != nil {
 		WriteNotFound(w, "sesion")
 		return
@@ -106,17 +106,17 @@ func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(SuccessWithMeta(messages, &APIMeta{Total: len(messages)}))
 }
 
-// Delete DELETE /api/projects/{projectPath}/sessions/{sessionID}
+// Delete DELETE /api/session-roots/{rootPath}/sessions/{sessionID}
 func (h *SessionsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
+	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
 
-	if projectPath == "" || sessionID == "" {
-		WriteBadRequest(w, "project path y session id requeridos")
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
 		return
 	}
 
-	if err := h.claude.DeleteSession(projectPath, sessionID); err != nil {
+	if err := h.claude.DeleteSession(rootPath, sessionID); err != nil {
 		WriteInternalError(w, err.Error())
 		return
 	}
@@ -125,16 +125,16 @@ func (h *SessionsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.terminals.RemoveFromSaved(sessionID)
 
 	// Invalidar cache
-	h.analytics.Invalidate(projectPath)
+	h.analytics.Invalidate(rootPath)
 
 	WriteSuccess(w, map[string]string{"message": "Sesion eliminada"})
 }
 
-// DeleteMultiple POST /api/projects/{projectPath}/sessions/delete
+// DeleteMultiple POST /api/session-roots/{rootPath}/sessions/delete
 func (h *SessionsHandler) DeleteMultiple(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
-	if projectPath == "" {
-		WriteBadRequest(w, "project path requerido")
+	rootPath := URLParamDecoded(r, "rootPath")
+	if rootPath == "" {
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *SessionsHandler) DeleteMultiple(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	deleted, _ := h.claude.DeleteMultipleSessions(projectPath, req.SessionIDs)
+	deleted, _ := h.claude.DeleteMultipleSessions(rootPath, req.SessionIDs)
 
 	// Eliminar del registro de terminales
 	for _, id := range req.SessionIDs {
@@ -154,36 +154,36 @@ func (h *SessionsHandler) DeleteMultiple(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Invalidar cache
-	h.analytics.Invalidate(projectPath)
+	h.analytics.Invalidate(rootPath)
 
 	WriteSuccess(w, map[string]interface{}{"deleted": deleted})
 }
 
-// CleanEmpty POST /api/projects/{projectPath}/sessions/clean
+// CleanEmpty POST /api/session-roots/{rootPath}/sessions/clean
 func (h *SessionsHandler) CleanEmpty(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
-	if projectPath == "" {
-		WriteBadRequest(w, "project path requerido")
+	rootPath := URLParamDecoded(r, "rootPath")
+	if rootPath == "" {
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
-	deleted, err := h.claude.CleanEmptySessions(projectPath)
+	deleted, err := h.claude.CleanEmptySessions(rootPath)
 	if err != nil {
 		WriteInternalError(w, err.Error())
 		return
 	}
 
 	// Invalidar cache
-	h.analytics.Invalidate(projectPath)
+	h.analytics.Invalidate(rootPath)
 
 	WriteSuccess(w, map[string]interface{}{"deleted": deleted})
 }
 
-// Import POST /api/projects/{projectPath}/sessions/import
+// Import POST /api/session-roots/{rootPath}/sessions/import
 func (h *SessionsHandler) Import(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
-	if projectPath == "" {
-		WriteBadRequest(w, "project path requerido")
+	rootPath := URLParamDecoded(r, "rootPath")
+	if rootPath == "" {
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -196,7 +196,7 @@ func (h *SessionsHandler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.claude.GetSession(projectPath, req.SessionID)
+	session, err := h.claude.GetSession(rootPath, req.SessionID)
 	if err != nil {
 		WriteNotFound(w, "sesion")
 		return
@@ -217,20 +217,20 @@ func (h *SessionsHandler) Import(w http.ResponseWriter, r *http.Request) {
 	h.terminals.MarkAsImported(req.SessionID, name, session.RealPath)
 
 	WriteSuccess(w, map[string]interface{}{
-		"session_id": req.SessionID,
-		"name":       name,
-		"project":    projectPath,
-		"work_dir":   session.RealPath,
+		"session_id":   req.SessionID,
+		"name":         name,
+		"session_root": rootPath,
+		"work_dir":     session.RealPath,
 	})
 }
 
-// Rename PUT /api/projects/{projectPath}/sessions/{sessionID}/rename
+// Rename PUT /api/session-roots/{rootPath}/sessions/{sessionID}/rename
 func (h *SessionsHandler) Rename(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
+	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
 
-	if projectPath == "" || sessionID == "" {
-		WriteBadRequest(w, "project path y session id requeridos")
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
 		return
 	}
 
@@ -243,7 +243,7 @@ func (h *SessionsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verificar que la sesión existe
-	session, err := h.claude.GetSession(projectPath, sessionID)
+	session, err := h.claude.GetSession(rootPath, sessionID)
 	if err != nil {
 		WriteNotFound(w, "sesion")
 		return

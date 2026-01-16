@@ -393,6 +393,9 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	s.terminals[cfg.ID] = terminal
 	s.mu.Unlock()
 
+	// Configurar callbacks de eventos de Claude (después de añadir a terminals)
+	s.setupClaudeCallbacks(terminal)
+
 	// Guardar
 	s.savedMu.Lock()
 	s.saved[cfg.ID] = &SavedTerminal{
@@ -466,6 +469,104 @@ func (s *TerminalService) broadcast(t *Terminal, data []byte) {
 
 	for client := range t.Clients {
 		client.WriteJSON(msg)
+	}
+}
+
+// ClaudeEventMessage representa un mensaje de evento de Claude enviado via WebSocket
+type ClaudeEventMessage struct {
+	Type      string      `json:"type"`       // Tipo principal: "claude:event"
+	EventType string      `json:"event_type"` // Subtipo: state, permission, command, checkpoint, tool
+	Data      interface{} `json:"data"`       // Datos del evento
+	Timestamp time.Time   `json:"timestamp"`  // Timestamp del evento
+}
+
+// StateChangeData datos de cambio de estado
+type StateChangeData struct {
+	OldState string `json:"old_state"`
+	NewState string `json:"new_state"`
+}
+
+// PermissionData datos de solicitud de permiso
+type PermissionData struct {
+	Tool string `json:"tool"`
+}
+
+// SlashCommandData datos de slash command
+type SlashCommandData struct {
+	Command string `json:"command"`
+	Args    string `json:"args"`
+}
+
+// ToolUseData datos de uso de herramienta
+type ToolUseData struct {
+	Tool  string `json:"tool"`
+	Phase string `json:"phase"` // "pre" o "post"
+}
+
+// broadcastClaudeEvent envía un evento de Claude a todos los clientes
+func (s *TerminalService) broadcastClaudeEvent(t *Terminal, eventType string, data interface{}) {
+	t.ClientsMu.RLock()
+	defer t.ClientsMu.RUnlock()
+
+	msg := ClaudeEventMessage{
+		Type:      "claude:event",
+		EventType: eventType,
+		Data:      data,
+		Timestamp: time.Now(),
+	}
+
+	for client := range t.Clients {
+		if err := client.WriteJSON(msg); err != nil {
+			logger.Debug("Error enviando evento claude", "error", err, "event_type", eventType)
+		}
+	}
+}
+
+// setupClaudeCallbacks configura los callbacks para eventos de Claude
+func (s *TerminalService) setupClaudeCallbacks(terminal *Terminal) {
+	if terminal.ClaudeScreen == nil {
+		return
+	}
+
+	// Callback para cambio de estado
+	terminal.ClaudeScreen.OnStateChange = func(old, new ClaudeState) {
+		logger.Debug("Claude state change", "terminal_id", terminal.ID, "old", old, "new", new)
+		s.broadcastClaudeEvent(terminal, "state", StateChangeData{
+			OldState: string(old),
+			NewState: string(new),
+		})
+	}
+
+	// Callback para solicitud de permiso
+	terminal.ClaudeScreen.OnPermissionPrompt = func(tool string) {
+		logger.Debug("Claude permission prompt", "terminal_id", terminal.ID, "tool", tool)
+		s.broadcastClaudeEvent(terminal, "permission", PermissionData{
+			Tool: tool,
+		})
+	}
+
+	// Callback para slash commands
+	terminal.ClaudeScreen.OnSlashCommand = func(cmd string, args string) {
+		logger.Debug("Claude slash command", "terminal_id", terminal.ID, "command", cmd, "args", args)
+		s.broadcastClaudeEvent(terminal, "command", SlashCommandData{
+			Command: cmd,
+			Args:    args,
+		})
+	}
+
+	// Callback para checkpoints
+	terminal.ClaudeScreen.OnCheckpoint = func(cp Checkpoint) {
+		logger.Debug("Claude checkpoint", "terminal_id", terminal.ID, "checkpoint_id", cp.ID)
+		s.broadcastClaudeEvent(terminal, "checkpoint", cp)
+	}
+
+	// Callback para uso de herramientas
+	terminal.ClaudeScreen.OnToolUse = func(tool string, phase string) {
+		logger.Debug("Claude tool use", "terminal_id", terminal.ID, "tool", tool, "phase", phase)
+		s.broadcastClaudeEvent(terminal, "tool", ToolUseData{
+			Tool:  tool,
+			Phase: phase,
+		})
 	}
 }
 

@@ -531,6 +531,273 @@ El WebSocket en `/api/terminals/{id}/ws` envía automáticamente un snapshot al 
 }
 ```
 
+### Eventos Claude Proactivos (WebSocket Push)
+
+El sistema envía eventos de Claude de forma proactiva via WebSocket. Esto elimina la necesidad de polling constante para detectar cambios de estado.
+
+#### Tipos de Mensajes WebSocket
+
+| Tipo | Descripción |
+|------|-------------|
+| `output` | Salida raw de la terminal (bytes PTY) |
+| `claude:event` | Evento específico de Claude (estructurado) |
+| `snapshot` | Estado inicial de pantalla al conectar |
+| `closed` | Terminal terminada |
+| `shutdown` | Servidor apagándose |
+
+#### Estructura de Evento Claude
+
+Todos los eventos Claude usan el tipo `claude:event` con la siguiente estructura:
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "<subtipo>",
+  "data": { ... },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+#### Evento: Cambio de Estado (`state`)
+
+Se emite cuando Claude cambia de estado (generating → waiting_input, etc.)
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "state",
+  "data": {
+    "old_state": "waiting_input",
+    "new_state": "generating"
+  },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+**Estados posibles:**
+- `unknown` - Estado inicial/desconocido
+- `waiting_input` - Esperando input del usuario
+- `generating` - Generando respuesta (spinner activo)
+- `permission_prompt` - Solicitando permiso
+- `tool_running` - Ejecutando herramienta
+- `background_task` - Tarea en background
+- `error` - Error detectado
+- `exited` - Sesión terminada
+
+#### Evento: Solicitud de Permiso (`permission`)
+
+Se emite cuando Claude solicita permiso para usar una herramienta.
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "permission",
+  "data": {
+    "tool": "Edit"
+  },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+#### Evento: Slash Command (`command`)
+
+Se emite cuando se detecta un slash command.
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "command",
+  "data": {
+    "command": "vim",
+    "args": ""
+  },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+#### Evento: Checkpoint (`checkpoint`)
+
+Se emite cuando se crea un nuevo checkpoint.
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "checkpoint",
+  "data": {
+    "id": "cp_abc123",
+    "timestamp": "2026-01-16T10:30:00Z",
+    "tool_used": "Edit",
+    "files_affected": ["src/main.go"]
+  },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+#### Evento: Uso de Herramienta (`tool`)
+
+Se emite antes (`pre`) y después (`post`) de usar una herramienta.
+
+```json
+{
+  "type": "claude:event",
+  "event_type": "tool",
+  "data": {
+    "tool": "Bash",
+    "phase": "pre"
+  },
+  "timestamp": "2026-01-16T10:30:00Z"
+}
+```
+
+### Ejemplo Completo de Cliente WebSocket
+
+```javascript
+const ws = new WebSocket(`ws://localhost:8080/api/terminals/${terminalId}/ws`);
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  switch (msg.type) {
+    case 'output':
+      // Salida raw de terminal - renderizar en xterm.js
+      terminal.write(msg.data);
+      break;
+
+    case 'snapshot':
+      // Estado inicial al conectar
+      restoreScreen(msg.snapshot);
+      break;
+
+    case 'claude:event':
+      // Eventos específicos de Claude
+      handleClaudeEvent(msg);
+      break;
+
+    case 'closed':
+      showNotification('Terminal cerrada');
+      break;
+
+    case 'shutdown':
+      showNotification('Servidor apagándose');
+      break;
+  }
+};
+
+function handleClaudeEvent(msg) {
+  const { event_type, data, timestamp } = msg;
+
+  switch (event_type) {
+    case 'state':
+      // Actualizar indicador de estado en UI
+      updateStateIndicator(data.new_state);
+
+      // Mostrar notificación si cambió a permission_prompt
+      if (data.new_state === 'permission_prompt') {
+        showPermissionBanner();
+      }
+
+      // Ocultar spinner si terminó de generar
+      if (data.old_state === 'generating' && data.new_state !== 'generating') {
+        hideLoadingSpinner();
+      }
+      break;
+
+    case 'permission':
+      // Mostrar diálogo de permiso
+      showPermissionDialog({
+        tool: data.tool,
+        onApprove: () => ws.send(JSON.stringify({ type: 'input', data: 'y\n' })),
+        onDeny: () => ws.send(JSON.stringify({ type: 'input', data: 'n\n' }))
+      });
+      break;
+
+    case 'command':
+      // Actualizar modo en UI
+      if (data.command === 'vim') {
+        setEditorMode('vim');
+      } else if (data.command === 'plan') {
+        setEditorMode('plan');
+      }
+      // Logging para analytics
+      trackSlashCommand(data.command, data.args);
+      break;
+
+    case 'checkpoint':
+      // Añadir checkpoint a timeline
+      addCheckpointToTimeline({
+        id: data.id,
+        tool: data.tool_used,
+        files: data.files_affected,
+        time: new Date(timestamp)
+      });
+      // Habilitar botón de rewind
+      enableRewindButton();
+      break;
+
+    case 'tool':
+      // Mostrar actividad de herramienta
+      if (data.phase === 'pre') {
+        showToolRunning(data.tool);
+      } else {
+        hideToolRunning(data.tool);
+      }
+      break;
+  }
+}
+```
+
+### Comparación: Polling vs Push Proactivo
+
+| Aspecto | Polling (antes) | Push Proactivo (ahora) |
+|---------|-----------------|------------------------|
+| **Latencia** | 100-500ms (intervalo polling) | ~0ms (instantáneo) |
+| **Carga servidor** | Alta (muchas requests) | Baja (solo eventos reales) |
+| **Carga red** | Alta (respuestas repetidas) | Baja (solo cambios) |
+| **Complejidad cliente** | Alta (manejar intervalos) | Baja (solo listeners) |
+| **Detección permisos** | Puede tardar 500ms | Instantánea |
+
+### Arquitectura de Eventos
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Terminal PTY                                │
+│                              │                                      │
+│                              ▼                                      │
+│                      readLoop(terminal)                             │
+│                              │                                      │
+│              ┌───────────────┼───────────────┐                      │
+│              ▼               ▼               ▼                      │
+│       ScreenState    ClaudeAwareScreen   broadcast()                │
+│       (emulación)    Handler (detección)  │                         │
+│                              │             │                        │
+│                              ▼             │                        │
+│                      analyzeContent()      │                        │
+│                              │             │                        │
+│              ┌───────────────┼─────┐       │                        │
+│              ▼               ▼     ▼       │                        │
+│         detectPatterns() detectState()     │                        │
+│              │               │     │       │                        │
+│              └───────────────┼─────┘       │                        │
+│                              │             │                        │
+│                              ▼             │                        │
+│                      Callbacks activados   │                        │
+│                              │             │                        │
+│              ┌───────────────┼─────────────┼──────────┐             │
+│              ▼               ▼             ▼          ▼             │
+│      OnStateChange  OnPermission   OnToolUse    broadcastClaudeEvent│
+│              │               │             │          │             │
+│              └───────────────┴─────────────┴──────────┘             │
+│                              │                                      │
+│                              ▼                                      │
+│                    WebSocket Clients                                │
+│                              │                                      │
+│              ┌───────────────┼───────────────┐                      │
+│              ▼               ▼               ▼                      │
+│         "output"      "claude:event"    "snapshot"                  │
+│        (raw bytes)    (estructurado)   (inicial)                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Casos de Uso
@@ -589,25 +856,128 @@ ws.onmessage = (event) => {
 };
 ```
 
-### 4. Callbacks de Eventos
+### 4. Callbacks de Eventos (Conectados a WebSocket)
+
+Los callbacks ahora están automáticamente conectados para enviar eventos via WebSocket:
 
 ```go
-// En el backend, configurar callbacks
-handler := NewClaudeAwareScreenHandler(80, 24)
+// En TerminalService.setupClaudeCallbacks() - services/terminal.go
+func (s *TerminalService) setupClaudeCallbacks(terminal *Terminal) {
+    if terminal.ClaudeScreen == nil {
+        return
+    }
 
-handler.OnStateChange = func(old, new ClaudeState) {
-    log.Printf("State changed: %s -> %s", old, new)
-    // Notificar a clientes WebSocket
+    // Cambio de estado → broadcast claude:event type=state
+    terminal.ClaudeScreen.OnStateChange = func(old, new ClaudeState) {
+        logger.Debug("Claude state change", "old", old, "new", new)
+        s.broadcastClaudeEvent(terminal, "state", StateChangeData{
+            OldState: string(old),
+            NewState: string(new),
+        })
+    }
+
+    // Permiso solicitado → broadcast claude:event type=permission
+    terminal.ClaudeScreen.OnPermissionPrompt = func(tool string) {
+        logger.Debug("Claude permission prompt", "tool", tool)
+        s.broadcastClaudeEvent(terminal, "permission", PermissionData{
+            Tool: tool,
+        })
+    }
+
+    // Slash command → broadcast claude:event type=command
+    terminal.ClaudeScreen.OnSlashCommand = func(cmd, args string) {
+        logger.Debug("Claude slash command", "command", cmd)
+        s.broadcastClaudeEvent(terminal, "command", SlashCommandData{
+            Command: cmd,
+            Args:    args,
+        })
+    }
+
+    // Checkpoint → broadcast claude:event type=checkpoint
+    terminal.ClaudeScreen.OnCheckpoint = func(cp Checkpoint) {
+        logger.Debug("Claude checkpoint", "id", cp.ID)
+        s.broadcastClaudeEvent(terminal, "checkpoint", cp)
+    }
+
+    // Uso de herramienta → broadcast claude:event type=tool
+    terminal.ClaudeScreen.OnToolUse = func(tool, phase string) {
+        logger.Debug("Claude tool use", "tool", tool, "phase", phase)
+        s.broadcastClaudeEvent(terminal, "tool", ToolUseData{
+            Tool:  tool,
+            Phase: phase,
+        })
+    }
 }
+```
 
-handler.OnPermissionPrompt = func(tool string) {
-    log.Printf("Permission requested for: %s", tool)
-    // Enviar notificación push
-}
+### 5. Reaccionar a Eventos en Tiempo Real (Frontend)
 
-handler.OnSlashCommand = func(cmd, args string) {
-    log.Printf("Slash command: /%s %s", cmd, args)
-    // Logging/analytics
+```javascript
+// Ejemplo: Auto-aprobar permisos de lectura
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  if (msg.type === 'claude:event' && msg.event_type === 'permission') {
+    if (msg.data.tool === 'Read') {
+      // Auto-aprobar lecturas
+      ws.send(JSON.stringify({ type: 'input', data: 'y\n' }));
+      logAction('Auto-approved Read permission');
+    } else {
+      // Mostrar diálogo para otras herramientas
+      showPermissionDialog(msg.data.tool);
+    }
+  }
+};
+```
+
+### 6. Dashboard de Estado en Tiempo Real
+
+```javascript
+// Componente React que reacciona a eventos push
+function ClaudeStatusDashboard({ terminalId }) {
+  const [state, setState] = useState('unknown');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pendingTool, setPendingTool] = useState(null);
+  const [checkpoints, setCheckpoints] = useState([]);
+
+  useEffect(() => {
+    const ws = new WebSocket(`ws://server/api/terminals/${terminalId}/ws`);
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === 'claude:event') {
+        switch (msg.event_type) {
+          case 'state':
+            setState(msg.data.new_state);
+            setIsGenerating(msg.data.new_state === 'generating');
+            if (msg.data.new_state !== 'permission_prompt') {
+              setPendingTool(null);
+            }
+            break;
+
+          case 'permission':
+            setPendingTool(msg.data.tool);
+            break;
+
+          case 'checkpoint':
+            setCheckpoints(prev => [...prev, msg.data]);
+            break;
+        }
+      }
+    };
+
+    return () => ws.close();
+  }, [terminalId]);
+
+  return (
+    <div className="dashboard">
+      <StateIndicator state={state} />
+      {isGenerating && <Spinner />}
+      {pendingTool && <PermissionBanner tool={pendingTool} />}
+      <CheckpointTimeline checkpoints={checkpoints} />
+    </div>
+  );
 }
 ```
 

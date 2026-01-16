@@ -13,13 +13,13 @@ import (
 
 // Router maneja el enrutamiento de la API usando Chi
 type Router struct {
-	chi       chi.Router
-	host      *handlers.HostHandler
-	projects  *handlers.ProjectsHandler
-	sessions  *handlers.SessionsHandler
-	terminals *handlers.TerminalsHandler
-	jobs      *handlers.JobsHandler
-	analytics *handlers.AnalyticsHandler
+	chi          chi.Router
+	host         *handlers.HostHandler
+	sessionRoots *handlers.SessionRootsHandler
+	sessions     *handlers.SessionsHandler
+	terminals    *handlers.TerminalsHandler
+	jobs         *handlers.JobsHandler
+	analytics    *handlers.AnalyticsHandler
 }
 
 // NewRouter crea un nuevo router con todos los handlers
@@ -32,13 +32,13 @@ func NewRouter(
 	allowedPathPrefixes []string,
 ) *Router {
 	return &Router{
-		chi:       chi.NewRouter(),
-		host:      handlers.NewHostHandler(hostName, version, claudeDir, terminals, claude),
-		projects:  handlers.NewProjectsHandler(claude, analytics),
-		sessions:  handlers.NewSessionsHandler(claude, terminals, analytics),
-		terminals: handlers.NewTerminalsHandler(terminals, allowedPathPrefixes),
-		jobs:      handlers.NewJobsHandler(jobs),
-		analytics: handlers.NewAnalyticsHandler(analytics),
+		chi:          chi.NewRouter(),
+		host:         handlers.NewHostHandler(hostName, version, claudeDir, terminals, claude),
+		sessionRoots: handlers.NewSessionRootsHandler(claude, analytics),
+		sessions:     handlers.NewSessionsHandler(claude, terminals, analytics),
+		terminals:    handlers.NewTerminalsHandler(terminals, allowedPathPrefixes),
+		jobs:         handlers.NewJobsHandler(jobs),
+		analytics:    handlers.NewAnalyticsHandler(analytics),
 	}
 }
 
@@ -64,18 +64,18 @@ func (r *Router) SetupRoutes() {
 		// Host info
 		api.Get("/host", r.host.Get)
 
-		// Projects
-		api.Route("/projects", func(projects chi.Router) {
-			projects.Get("/", r.projects.List)
+		// Session Roots (directorios donde se han ejecutado sesiones de Claude)
+		api.Route("/session-roots", func(roots chi.Router) {
+			roots.Get("/", r.sessionRoots.List)
 
-			// Rutas con path de proyecto
-			projects.Route("/{projectPath}", func(project chi.Router) {
-				project.Get("/", r.projects.Get)
-				project.Delete("/", r.projects.Delete)
-				project.Get("/activity", r.projects.GetActivity)
+			// Rutas con path del session-root
+			roots.Route("/{rootPath}", func(root chi.Router) {
+				root.Get("/", r.sessionRoots.Get)
+				root.Delete("/", r.sessionRoots.Delete)
+				root.Get("/activity", r.sessionRoots.GetActivity)
 
-				// Sessions dentro de proyecto
-				project.Route("/sessions", func(sessions chi.Router) {
+				// Sessions dentro del session-root
+				root.Route("/sessions", func(sessions chi.Router) {
 					sessions.Get("/", r.sessions.List)
 					sessions.Post("/delete", r.sessions.DeleteMultiple)
 					sessions.Post("/clean", r.sessions.CleanEmpty)
@@ -90,8 +90,8 @@ func (r *Router) SetupRoutes() {
 					})
 				})
 
-				// Jobs dentro de proyecto
-				project.Route("/jobs", func(jobsRouter chi.Router) {
+				// Jobs dentro del session-root
+				root.Route("/jobs", func(jobsRouter chi.Router) {
 					jobsRouter.Get("/", r.jobs.ListJobs)
 					jobsRouter.Post("/", r.jobs.CreateJob)
 
@@ -146,7 +146,7 @@ func (r *Router) SetupRoutes() {
 		// Analytics
 		api.Route("/analytics", func(anal chi.Router) {
 			anal.Get("/global", r.analytics.GetGlobal)
-			anal.Get("/projects/{projectPath}", r.analytics.GetProject)
+			anal.Get("/session-roots/{rootPath}", r.analytics.GetSessionRoot)
 			anal.Post("/invalidate", r.analytics.Invalidate)
 			anal.Get("/cache", r.analytics.GetCacheStatus)
 		})
