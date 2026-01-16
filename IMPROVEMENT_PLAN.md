@@ -6,7 +6,7 @@
 
 ## Resumen Ejecutivo
 
-Este plan está organizado en **6 fases** con prioridades claras. Cada fase tiene dependencias mínimas con las demás, permitiendo trabajo paralelo donde sea posible.
+Este plan está organizado en **5 fases** con prioridades claras. Cada fase tiene dependencias mínimas con las demás, permitiendo trabajo paralelo donde sea posible.
 
 | Fase | Nombre | Prioridad | Impacto |
 |------|--------|-----------|---------|
@@ -15,7 +15,6 @@ Este plan está organizado en **6 fases** con prioridades claras. Cada fase tien
 | 3 | Seguridad Hardening | ALTA | Crítico |
 | 4 | Observabilidad | MEDIA | Medio |
 | 5 | Performance & Escalabilidad | MEDIA | Medio |
-| 6 | DevOps & CI/CD | MEDIA | Alto |
 
 ---
 
@@ -1268,253 +1267,12 @@ func (c *Cache[T]) Set(key string, value T) {
 
 ---
 
-## FASE 6: DevOps & CI/CD (MEDIA)
-
-### 6.1 GitHub Actions Workflow
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage.out
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-          args: --timeout=5m
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Gosec
-        uses: securecodewarrior/github-action-gosec@v1
-
-      - name: Run Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-
-  build:
-    needs: [test, lint]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Build
-        run: |
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o claude-monitor .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: claude-monitor
-          path: claude-monitor
-```
-
-### 6.2 Dockerfile Optimizado
-
-```dockerfile
-# Dockerfile
-# Build stage
-FROM golang:1.23-alpine AS builder
-
-WORKDIR /app
-
-# Install dependencies first (caching)
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source
-COPY . .
-
-# Build
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-s -w -X main.version=${VERSION}" \
-    -o claude-monitor .
-
-# Runtime stage
-FROM alpine:3.19
-
-RUN apk --no-cache add ca-certificates tzdata
-
-# Non-root user
-RUN adduser -D -g '' appuser
-USER appuser
-
-WORKDIR /app
-
-COPY --from=builder /app/claude-monitor .
-
-EXPOSE 9090
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD wget -qO- http://localhost:9090/api/health || exit 1
-
-ENTRYPOINT ["./claude-monitor"]
-```
-
-### 6.3 Docker Compose para Desarrollo
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  claude-monitor:
-    build: .
-    ports:
-      - "9090:9090"
-    environment:
-      - CLAUDE_MONITOR_HOST=0.0.0.0
-      - CLAUDE_MONITOR_PORT=9090
-      - CLAUDE_MONITOR_PASSWORD=${CLAUDE_MONITOR_PASSWORD}
-      - CLAUDE_MONITOR_API_TOKEN=${CLAUDE_MONITOR_API_TOKEN}
-      - CLAUDE_DIR=/claude
-    volumes:
-      - ~/.claude:/claude:ro
-      - ./data:/app/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9090/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources
-
-volumes:
-  grafana-data:
-```
-
-### 6.4 Makefile
-
-```makefile
-# Makefile
-.PHONY: build test lint clean docker run
-
-VERSION ?= $(shell git describe --tags --always --dirty)
-LDFLAGS := -ldflags="-s -w -X main.version=$(VERSION)"
-
-build:
-	go build $(LDFLAGS) -o bin/claude-monitor .
-
-test:
-	go test -v -race -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-
-test-integration:
-	go test -v -tags=integration ./tests/integration/...
-
-lint:
-	golangci-lint run
-
-security:
-	gosec ./...
-	trivy fs .
-
-clean:
-	rm -rf bin/ coverage.out coverage.html
-
-docker:
-	docker build -t claude-monitor:$(VERSION) .
-
-docker-push:
-	docker tag claude-monitor:$(VERSION) ghcr.io/$(REPO)/claude-monitor:$(VERSION)
-	docker push ghcr.io/$(REPO)/claude-monitor:$(VERSION)
-
-run:
-	go run . -log-level debug
-
-dev:
-	air # Hot reload (github.com/cosmtrek/air)
-
-deps:
-	go mod download
-	go mod tidy
-
-generate:
-	go generate ./...
-
-all: deps lint test build
-```
-
----
-
 ## Cronograma de Implementación
 
 ```
                     SEMANA
-FASE               1   2   3   4   5   6   7   8
-─────────────────────────────────────────────────
+FASE               1   2   3   4   5   6
+───────────────────────────────────────────
 1. Testing         ████████████
    - Unit tests    ████
    - Integration       ████
@@ -1538,11 +1296,7 @@ FASE               1   2   3   4   5   6   7   8
 5. Performance                     ████████
    - Pooling                       ████
    - Caching                           ████
-
-6. DevOps                              ████████
-   - CI/CD                             ████
-   - Docker                                ████
-─────────────────────────────────────────────────
+───────────────────────────────────────────
 ```
 
 ---
@@ -1570,6 +1324,5 @@ Este plan transforma Claude Monitor de un proyecto funcional a uno listo para pr
 3. **Seguridad hardened** - Rate limiting, audit logs, secrets management
 4. **Observabilidad completa** - Métricas, tracing, health checks
 5. **Performance optimizado** - Pooling, caching, buffers
-6. **CI/CD automatizado** - Tests, lint, security, deployment
 
 *"El código que funciona es solo el comienzo. El código que se puede mantener es el objetivo."*
