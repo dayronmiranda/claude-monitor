@@ -218,6 +218,30 @@ func (r *Router) routeTerminalsWithID(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// GET /api/terminals/{id}/snapshot
+	if strings.HasSuffix(path, "/snapshot") && req.Method == http.MethodGet {
+		r.terminals.Snapshot(w, req)
+		return
+	}
+
+	// GET /api/terminals/{id}/claude-state
+	if strings.HasSuffix(path, "/claude-state") && req.Method == http.MethodGet {
+		r.terminals.ClaudeState(w, req)
+		return
+	}
+
+	// GET /api/terminals/{id}/checkpoints
+	if strings.HasSuffix(path, "/checkpoints") && req.Method == http.MethodGet {
+		r.terminals.ClaudeCheckpoints(w, req)
+		return
+	}
+
+	// GET /api/terminals/{id}/events
+	if strings.HasSuffix(path, "/events") && req.Method == http.MethodGet {
+		r.terminals.ClaudeEvents(w, req)
+		return
+	}
+
 	// /api/terminals/{id}
 	switch req.Method {
 	case http.MethodGet:

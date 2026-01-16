@@ -47,6 +47,8 @@ type Terminal struct {
 	Clients   map[*websocket.Conn]bool `json:"-"`
 	ClientsMu sync.RWMutex             `json:"-"`
 	Config    TerminalConfig           `json:"-"`
+	Screen    *ScreenState             `json:"-"` // Estado de pantalla virtual (go-ansiterm)
+	ClaudeScreen *ClaudeAwareScreenHandler `json:"-"` // Estado extendido para terminales Claude
 }
 
 // SavedTerminal terminal guardada para persistencia
@@ -378,6 +380,13 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 		Pty:       ptmx,
 		Clients:   make(map[*websocket.Conn]bool),
 		Config:    cfg,
+		Screen:    NewScreenState(80, 24), // Pantalla virtual para tracking de estado
+	}
+
+	// Para terminales de tipo "claude", usar ClaudeAwareScreenHandler
+	if cfg.Type == "claude" {
+		terminal.ClaudeScreen = NewClaudeAwareScreenHandler(80, 24)
+		logger.Debug("ClaudeAwareScreenHandler inicializado", "terminal_id", cfg.ID)
 	}
 
 	s.mu.Lock()
@@ -426,6 +435,21 @@ func (s *TerminalService) readLoop(t *Terminal) {
 			}
 			break
 		}
+
+		// Alimentar el estado de pantalla virtual con go-ansiterm
+		if t.Screen != nil {
+			if feedErr := t.Screen.Feed(buf[:n]); feedErr != nil {
+				logger.Debug("Error feeding screen state", "terminal_id", t.ID, "error", feedErr)
+			}
+		}
+
+		// Para terminales Claude, alimentar también el ClaudeAwareScreenHandler
+		if t.ClaudeScreen != nil {
+			if feedErr := t.ClaudeScreen.Feed(buf[:n]); feedErr != nil {
+				logger.Debug("Error feeding claude screen state", "terminal_id", t.ID, "error", feedErr)
+			}
+		}
+
 		s.broadcast(t, buf[:n])
 	}
 }
@@ -643,7 +667,147 @@ func (s *TerminalService) Resize(id string, rows, cols uint16) error {
 	if errno != 0 {
 		return errno
 	}
+
+	// Actualizar también el estado de pantalla virtual
+	if terminal.Screen != nil {
+		terminal.Screen.Resize(int(cols), int(rows))
+	}
+
+	// Actualizar ClaudeScreen si existe
+	if terminal.ClaudeScreen != nil {
+		terminal.ClaudeScreen.ScreenState.Resize(int(cols), int(rows))
+	}
+
 	return nil
+}
+
+// GetClaudeState retorna el estado de Claude para una terminal
+func (s *TerminalService) GetClaudeState(id string) (*ClaudeStateInfo, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada o no activa: %s", id)
+	}
+
+	if terminal.ClaudeScreen == nil {
+		return nil, fmt.Errorf("claude state no disponible (terminal no es de tipo claude): %s", id)
+	}
+
+	state := terminal.ClaudeScreen.GetClaudeState()
+	return &state, nil
+}
+
+// GetClaudeCheckpoints retorna los checkpoints de una terminal Claude
+func (s *TerminalService) GetClaudeCheckpoints(id string) ([]Checkpoint, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	if terminal.ClaudeScreen == nil {
+		return nil, fmt.Errorf("checkpoints no disponibles (terminal no es de tipo claude): %s", id)
+	}
+
+	return terminal.ClaudeScreen.GetCheckpoints(), nil
+}
+
+// GetClaudeEvents retorna el historial de eventos de una terminal Claude
+func (s *TerminalService) GetClaudeEvents(id string) ([]HookEvent, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	if terminal.ClaudeScreen == nil {
+		return nil, fmt.Errorf("eventos no disponibles (terminal no es de tipo claude): %s", id)
+	}
+
+	return terminal.ClaudeScreen.GetEventHistory(), nil
+}
+
+// AddClaudeCheckpoint agrega un checkpoint manualmente
+func (s *TerminalService) AddClaudeCheckpoint(id string, checkpointID string, tool string, files []string) error {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	if terminal.ClaudeScreen == nil {
+		return fmt.Errorf("terminal no es de tipo claude: %s", id)
+	}
+
+	terminal.ClaudeScreen.AddCheckpoint(checkpointID, tool, files)
+	return nil
+}
+
+// AddClaudeEvent agrega un evento manualmente
+func (s *TerminalService) AddClaudeEvent(id string, eventType HookEventType, tool string, data interface{}) error {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	if terminal.ClaudeScreen == nil {
+		return fmt.Errorf("terminal no es de tipo claude: %s", id)
+	}
+
+	terminal.ClaudeScreen.AddEvent(eventType, tool, data)
+	return nil
+}
+
+// GetSnapshot retorna el estado actual de la pantalla de una terminal
+func (s *TerminalService) GetSnapshot(id string) (*TerminalSnapshot, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada o no activa: %s", id)
+	}
+
+	if terminal.Screen == nil {
+		return nil, fmt.Errorf("screen state no disponible para terminal: %s", id)
+	}
+
+	cursorX, cursorY := terminal.Screen.GetCursor()
+	width, height := terminal.Screen.GetSize()
+
+	return &TerminalSnapshot{
+		Content:           terminal.Screen.Snapshot(),
+		Display:           terminal.Screen.GetDisplay(),
+		CursorX:           cursorX,
+		CursorY:           cursorY,
+		Width:             width,
+		Height:            height,
+		InAlternateScreen: terminal.Screen.IsInAlternateScreen(),
+		History:           terminal.Screen.GetHistoryLines(),
+	}, nil
+}
+
+// TerminalSnapshot representa el estado completo de una pantalla de terminal
+type TerminalSnapshot struct {
+	Content           string   `json:"content"`             // Texto plano de la pantalla
+	Display           []string `json:"display"`             // Líneas individuales
+	CursorX           int      `json:"cursor_x"`            // Posición X del cursor
+	CursorY           int      `json:"cursor_y"`            // Posición Y del cursor
+	Width             int      `json:"width"`               // Ancho de la pantalla
+	Height            int      `json:"height"`              // Alto de la pantalla
+	InAlternateScreen bool     `json:"in_alternate_screen"` // Si está en modo vim/htop
+	History           []string `json:"history,omitempty"`   // Historial de scroll
 }
 
 // AddClient añade un cliente WebSocket
