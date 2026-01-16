@@ -327,6 +327,66 @@ func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessResponse(snapshot))
 }
 
+// ClaudeState GET /api/terminals/{id}/claude-state
+func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/claude-state")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		return
+	}
+
+	state, err := h.terminals.GetClaudeState(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		return
+	}
+
+	json.NewEncoder(w).Encode(SuccessResponse(state))
+}
+
+// ClaudeCheckpoints GET /api/terminals/{id}/checkpoints
+func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/checkpoints")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		return
+	}
+
+	checkpoints, err := h.terminals.GetClaudeCheckpoints(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		return
+	}
+
+	json.NewEncoder(w).Encode(SuccessWithMeta(checkpoints, &APIMeta{Total: len(checkpoints)}))
+}
+
+// ClaudeEvents GET /api/terminals/{id}/events
+func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/events")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		return
+	}
+
+	events, err := h.terminals.GetClaudeEvents(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		return
+	}
+
+	json.NewEncoder(w).Encode(SuccessWithMeta(events, &APIMeta{Total: len(events)}))
+}
+
 // extractTerminalID extrae el ID de terminal de la URL
 func extractTerminalID(urlPath string) string {
 	path := strings.TrimPrefix(urlPath, "/api/terminals/")
@@ -335,6 +395,9 @@ func extractTerminalID(urlPath string) string {
 	path = strings.TrimSuffix(path, "/resume")
 	path = strings.TrimSuffix(path, "/resize")
 	path = strings.TrimSuffix(path, "/snapshot")
+	path = strings.TrimSuffix(path, "/claude-state")
+	path = strings.TrimSuffix(path, "/checkpoints")
+	path = strings.TrimSuffix(path, "/events")
 	path = strings.TrimSuffix(path, "/ws")
 	return path
 }
