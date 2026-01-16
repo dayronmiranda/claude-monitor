@@ -218,6 +218,12 @@ func (r *Router) routeTerminalsWithID(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// GET /api/terminals/{id}/snapshot
+	if strings.HasSuffix(path, "/snapshot") && req.Method == http.MethodGet {
+		r.terminals.Snapshot(w, req)
+		return
+	}
+
 	// /api/terminals/{id}
 	switch req.Method {
 	case http.MethodGet:

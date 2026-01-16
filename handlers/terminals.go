@@ -219,6 +219,15 @@ func (h *TerminalsHandler) WebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enviar snapshot inicial al cliente (estado actual de la pantalla)
+	if snapshot, err := h.terminals.GetSnapshot(id); err == nil {
+		conn.WriteJSON(map[string]interface{}{
+			"type":     "snapshot",
+			"snapshot": snapshot,
+		})
+		logger.Debug("Snapshot inicial enviado", "terminal_id", id)
+	}
+
 	// Configurar ping/pong
 	const (
 		pingInterval = 30 * time.Second
@@ -298,6 +307,26 @@ func (h *TerminalsHandler) ListDir(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
+// Snapshot GET /api/terminals/{id}/snapshot
+func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/snapshot")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		return
+	}
+
+	snapshot, err := h.terminals.GetSnapshot(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		return
+	}
+
+	json.NewEncoder(w).Encode(SuccessResponse(snapshot))
+}
+
 // extractTerminalID extrae el ID de terminal de la URL
 func extractTerminalID(urlPath string) string {
 	path := strings.TrimPrefix(urlPath, "/api/terminals/")
@@ -305,6 +334,7 @@ func extractTerminalID(urlPath string) string {
 	path = strings.TrimSuffix(path, "/kill")
 	path = strings.TrimSuffix(path, "/resume")
 	path = strings.TrimSuffix(path, "/resize")
+	path = strings.TrimSuffix(path, "/snapshot")
 	path = strings.TrimSuffix(path, "/ws")
 	return path
 }
