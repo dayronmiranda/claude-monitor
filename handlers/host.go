@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"claude-monitor/pkg/metrics"
 	"claude-monitor/services"
 )
 
@@ -51,8 +52,9 @@ const (
 
 // HealthCheck resultado de un check de salud
 type HealthCheck struct {
-	Status  HealthStatus `json:"status"`
-	Message string       `json:"message,omitempty"`
+	Status   HealthStatus `json:"status"`
+	Message  string       `json:"message,omitempty"`
+	Duration string       `json:"duration,omitempty"`
 }
 
 // HealthResponse respuesta del endpoint de salud
@@ -225,60 +227,84 @@ func (h *HostHandler) Ready(w http.ResponseWriter, r *http.Request) {
 
 // checkFilesystem verifica acceso al filesystem
 func (h *HostHandler) checkFilesystem() HealthCheck {
+	start := time.Now()
+	var result HealthCheck
+
 	if _, err := os.Stat(h.claudeDir); err != nil {
-		return HealthCheck{
+		result = HealthCheck{
 			Status:  HealthStatusDegraded,
 			Message: "claude_dir not accessible: " + err.Error(),
 		}
+	} else {
+		result = HealthCheck{Status: HealthStatusHealthy}
 	}
-	return HealthCheck{Status: HealthStatusHealthy}
+
+	duration := time.Since(start)
+	result.Duration = duration.String()
+	metrics.RecordHealthCheck("filesystem", duration, string(result.Status))
+	return result
 }
 
 // checkGoroutines verifica cantidad de goroutines
 func (h *HostHandler) checkGoroutines() HealthCheck {
+	start := time.Now()
 	count := runtime.NumGoroutine()
+	var result HealthCheck
 
 	// Thresholds
 	if count > 10000 {
-		return HealthCheck{
+		result = HealthCheck{
 			Status:  HealthStatusUnhealthy,
 			Message: "too many goroutines",
 		}
-	}
-	if count > 1000 {
-		return HealthCheck{
+	} else if count > 1000 {
+		result = HealthCheck{
 			Status:  HealthStatusDegraded,
 			Message: "high goroutine count",
 		}
+	} else {
+		result = HealthCheck{Status: HealthStatusHealthy}
 	}
-	return HealthCheck{Status: HealthStatusHealthy}
+
+	duration := time.Since(start)
+	result.Duration = duration.String()
+	metrics.RecordHealthCheck("goroutines", duration, string(result.Status))
+	return result
 }
 
 // checkMemory verifica uso de memoria
 func (h *HostHandler) checkMemory() HealthCheck {
+	start := time.Now()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
+	var result HealthCheck
 
 	heapMB := m.HeapAlloc / 1024 / 1024
 
 	// Thresholds (ajustar según necesidad)
 	if heapMB > 2048 { // >2GB
-		return HealthCheck{
+		result = HealthCheck{
 			Status:  HealthStatusUnhealthy,
 			Message: "heap memory too high",
 		}
-	}
-	if heapMB > 512 { // >512MB
-		return HealthCheck{
+	} else if heapMB > 512 { // >512MB
+		result = HealthCheck{
 			Status:  HealthStatusDegraded,
 			Message: "high memory usage",
 		}
+	} else {
+		result = HealthCheck{Status: HealthStatusHealthy}
 	}
-	return HealthCheck{Status: HealthStatusHealthy}
+
+	duration := time.Since(start)
+	result.Duration = duration.String()
+	metrics.RecordHealthCheck("memory", duration, string(result.Status))
+	return result
 }
 
 // checkTerminals verifica estado de terminales
 func (h *HostHandler) checkTerminals() HealthCheck {
+	start := time.Now()
 	terminals := h.terminals.List()
 	activeCount := 0
 	for _, t := range terminals {
@@ -286,12 +312,19 @@ func (h *HostHandler) checkTerminals() HealthCheck {
 			activeCount++
 		}
 	}
+	var result HealthCheck
 
 	if activeCount > 50 {
-		return HealthCheck{
+		result = HealthCheck{
 			Status:  HealthStatusDegraded,
 			Message: "many active terminals",
 		}
+	} else {
+		result = HealthCheck{Status: HealthStatusHealthy}
 	}
-	return HealthCheck{Status: HealthStatusHealthy}
+
+	duration := time.Since(start)
+	result.Duration = duration.String()
+	metrics.RecordHealthCheck("terminals", duration, string(result.Status))
+	return result
 }

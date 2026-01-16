@@ -76,6 +76,8 @@ func (e *APIError) HTTPStatus() int {
 		return http.StatusBadRequest
 	case ErrCodeConflict:
 		return http.StatusConflict
+	case ErrCodeTooManyRequests:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}
@@ -137,4 +139,75 @@ func InvalidInput(field, reason string) *APIError {
 // Conflict crea un error de conflicto
 func Conflict(message string) *APIError {
 	return New(ErrCodeConflict, message)
+}
+
+// Wrap envuelve un error con contexto adicional
+func Wrap(err error, message string) error {
+	if err == nil {
+		return nil
+	}
+	return &wrappedError{
+		err:     err,
+		message: message,
+	}
+}
+
+// WrapWithCode envuelve un error con código API
+func WrapWithCode(err error, code ErrorCode, message string) *APIError {
+	if err == nil {
+		return nil
+	}
+	return &APIError{
+		Code:    code,
+		Message: message,
+		Details: map[string]interface{}{
+			"cause": err.Error(),
+		},
+	}
+}
+
+// wrappedError implementa error wrapping
+type wrappedError struct {
+	err     error
+	message string
+}
+
+func (w *wrappedError) Error() string {
+	return w.message + ": " + w.err.Error()
+}
+
+func (w *wrappedError) Unwrap() error {
+	return w.err
+}
+
+// IsNotFound verifica si es un error NotFound
+func IsNotFound(err error) bool {
+	if apiErr, ok := err.(*APIError); ok {
+		return apiErr.Code == ErrCodeNotFound
+	}
+	return false
+}
+
+// IsUnauthorized verifica si es un error Unauthorized
+func IsUnauthorized(err error) bool {
+	if apiErr, ok := err.(*APIError); ok {
+		return apiErr.Code == ErrCodeUnauthorized
+	}
+	return false
+}
+
+// IsBadRequest verifica si es un error BadRequest
+func IsBadRequest(err error) bool {
+	if apiErr, ok := err.(*APIError); ok {
+		return apiErr.Code == ErrCodeBadRequest || apiErr.Code == ErrCodeInvalidInput
+	}
+	return false
+}
+
+// TooManyRequests para rate limiting
+const ErrCodeTooManyRequests ErrorCode = "TOO_MANY_REQUESTS"
+
+// TooManyRequests crea un error de rate limiting
+func TooManyRequests(message string) *APIError {
+	return New(ErrCodeTooManyRequests, message)
 }

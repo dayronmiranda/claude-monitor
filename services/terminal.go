@@ -977,7 +977,13 @@ func (s *TerminalService) RemoveFromSaved(id string) {
 }
 
 // ShutdownAll termina todas las terminales activas ordenadamente
+// Usa WaitGroup para esperar terminación en lugar de time.Sleep
 func (s *TerminalService) ShutdownAll() {
+	s.ShutdownAllWithTimeout(5 * time.Second)
+}
+
+// ShutdownAllWithTimeout termina todas las terminales con timeout configurable
+func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 	s.mu.RLock()
 	ids := make([]string, 0, len(s.terminals))
 	for id := range s.terminals {
@@ -992,12 +998,16 @@ func (s *TerminalService) ShutdownAll() {
 
 	logger.Info("Terminando terminales activas", "count", len(ids))
 
+	// Canal para señalar terminación
+	done := make(chan string, len(ids))
+
 	for _, id := range ids {
 		s.mu.RLock()
 		terminal, ok := s.terminals[id]
 		s.mu.RUnlock()
 
 		if !ok {
+			done <- id
 			continue
 		}
 
@@ -1015,27 +1025,50 @@ func (s *TerminalService) ShutdownAll() {
 		if terminal.Cmd != nil && terminal.Cmd.Process != nil {
 			logger.Get().Terminal("shutdown", id)
 			terminal.Cmd.Process.Signal(syscall.SIGTERM)
+
+			// Goroutine para esperar terminación de este proceso
+			go func(t *Terminal, termID string) {
+				if t.Cmd != nil && t.Cmd.Process != nil {
+					t.Cmd.Wait()
+				}
+				done <- termID
+			}(terminal, id)
+		} else {
+			done <- id
 		}
 	}
 
-	// Esperar un poco para que terminen
-	time.Sleep(2 * time.Second)
+	// Esperar terminación con timeout
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
-	// Force kill si aún quedan
-	s.mu.RLock()
-	remaining := len(s.terminals)
-	s.mu.RUnlock()
+	terminated := 0
+	for terminated < len(ids) {
+		select {
+		case termID := <-done:
+			terminated++
+			logger.Debug("Terminal terminada", "id", termID, "terminated", terminated, "total", len(ids))
+		case <-timer.C:
+			// Timeout - forzar terminación de restantes
+			s.mu.RLock()
+			remaining := len(s.terminals)
+			s.mu.RUnlock()
 
-	if remaining > 0 {
-		logger.Warn("Forzando terminación de terminales restantes", "count", remaining)
-		s.mu.RLock()
-		for _, terminal := range s.terminals {
-			if terminal.Cmd != nil && terminal.Cmd.Process != nil {
-				terminal.Cmd.Process.Kill()
+			if remaining > 0 {
+				logger.Warn("Timeout esperando terminación, forzando kill", "remaining", remaining)
+				s.mu.RLock()
+				for _, terminal := range s.terminals {
+					if terminal.Cmd != nil && terminal.Cmd.Process != nil {
+						terminal.Cmd.Process.Kill()
+					}
+				}
+				s.mu.RUnlock()
 			}
+			return
 		}
-		s.mu.RUnlock()
 	}
+
+	logger.Info("Todas las terminales terminadas correctamente")
 }
 
 // PersistState persiste el estado actual

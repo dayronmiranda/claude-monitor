@@ -115,6 +115,50 @@ const (
 	ContextKeyLogger    contextKey = "logger"
 )
 
+// LogFields campos estándar para logging estructurado
+type LogFields struct {
+	RequestID   string
+	UserIP      string
+	TerminalID  string
+	SessionID   string
+	ProjectPath string
+	Action      string
+	Duration    time.Duration
+	Error       error
+}
+
+// WithFields crea un logger con campos estándar
+func (l *Logger) WithFields(fields LogFields) *Logger {
+	attrs := []any{}
+
+	if fields.RequestID != "" {
+		attrs = append(attrs, "request_id", fields.RequestID)
+	}
+	if fields.UserIP != "" {
+		attrs = append(attrs, "user_ip", fields.UserIP)
+	}
+	if fields.TerminalID != "" {
+		attrs = append(attrs, "terminal_id", fields.TerminalID)
+	}
+	if fields.SessionID != "" {
+		attrs = append(attrs, "session_id", fields.SessionID)
+	}
+	if fields.ProjectPath != "" {
+		attrs = append(attrs, "project", fields.ProjectPath)
+	}
+	if fields.Action != "" {
+		attrs = append(attrs, "action", fields.Action)
+	}
+	if fields.Duration > 0 {
+		attrs = append(attrs, "duration_ms", fields.Duration.Milliseconds())
+	}
+	if fields.Error != nil {
+		attrs = append(attrs, "error", fields.Error.Error())
+	}
+
+	return l.With(attrs...)
+}
+
 // FromContext obtiene logger del contexto
 func FromContext(ctx context.Context) *Logger {
 	if l, ok := ctx.Value(ContextKeyLogger).(*Logger); ok {

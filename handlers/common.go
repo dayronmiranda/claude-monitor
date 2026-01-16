@@ -2,9 +2,29 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
+
+	"github.com/go-chi/chi/v5"
 
 	apierrors "claude-monitor/pkg/errors"
 )
+
+// URLParam obtiene un parámetro de URL de Chi
+// Es un wrapper de chi.URLParam para uso en handlers
+func URLParam(r *http.Request, key string) string {
+	return chi.URLParam(r, key)
+}
+
+// URLParamDecoded obtiene un parámetro de URL decodificado
+// Útil para paths que pueden contener caracteres especiales
+func URLParamDecoded(r *http.Request, key string) string {
+	param := chi.URLParam(r, key)
+	decoded, err := url.PathUnescape(param)
+	if err != nil {
+		return param
+	}
+	return decoded
+}
 
 // APIMeta metadatos de respuesta
 type APIMeta struct {

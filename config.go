@@ -33,6 +33,15 @@ type Config struct {
 	// Security
 	AllowedPathPrefixes []string `json:"allowed_path_prefixes"`
 
+	// Rate Limiting
+	RateLimitEnabled bool    `json:"rate_limit_enabled"`
+	RateLimitRPS     float64 `json:"rate_limit_rps"`
+	RateLimitBurst   int     `json:"rate_limit_burst"`
+
+	// Resource Limits
+	MaxTerminals        int `json:"max_terminals"`
+	MaxWebSocketClients int `json:"max_websocket_clients"`
+
 	// Paths
 	ClaudeDir  string `json:"claude_dir"`
 	WorkingDir string `json:"working_dir"`
@@ -41,22 +50,42 @@ type Config struct {
 	CacheDurationMinutes int `json:"cache_duration_minutes"`
 }
 
-// DefaultConfig configuración por defecto
+// DefaultConfig configuración por defecto con valores seguros
 func DefaultConfig() *Config {
 	homeDir, _ := os.UserHomeDir()
 	hostname, _ := os.Hostname()
 
 	return &Config{
-		Port:                 9090,
-		Host:                 "0.0.0.0",
-		HostName:             hostname,
-		Username:             "admin",
-		Password:             "",
-		APIToken:             "",
-		AllowedOrigins:       []string{}, // Vacío = permitir todos (desarrollo)
-		AllowedPathPrefixes:  []string{}, // Vacío = permitir todos (desarrollo)
-		ClaudeDir:            filepath.Join(homeDir, ".claude", "projects"),
-		WorkingDir:           homeDir,
+		// Server - localhost por defecto es más seguro
+		Port:     9090,
+		Host:     "127.0.0.1", // Solo localhost por defecto (más seguro)
+		HostName: hostname,
+
+		// Auth
+		Username: "admin",
+		Password: "",
+		APIToken: "",
+
+		// CORS - vacío en desarrollo, configurar en producción
+		AllowedOrigins: []string{},
+
+		// Security - restringir a home por defecto
+		AllowedPathPrefixes: []string{homeDir},
+
+		// Rate Limiting - habilitado por defecto
+		RateLimitEnabled: true,
+		RateLimitRPS:     10,  // 10 requests por segundo
+		RateLimitBurst:   20,  // burst de 20
+
+		// Resource Limits
+		MaxTerminals:        10,
+		MaxWebSocketClients: 50,
+
+		// Paths
+		ClaudeDir:  filepath.Join(homeDir, ".claude", "projects"),
+		WorkingDir: homeDir,
+
+		// Cache
 		CacheDurationMinutes: 5,
 	}
 }

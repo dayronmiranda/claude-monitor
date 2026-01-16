@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"claude-monitor/services"
 )
@@ -24,21 +23,18 @@ func (h *AnalyticsHandler) GetGlobal(w http.ResponseWriter, r *http.Request) {
 
 	analytics, err := h.analytics.GetGlobal(forceRefresh)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteInternalError(w, err.Error())
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(analytics))
+	WriteSuccess(w, analytics)
 }
 
-// GetProject GET /api/analytics/projects/{path}
+// GetProject GET /api/analytics/projects/{projectPath}
 func (h *AnalyticsHandler) GetProject(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/analytics/projects/")
-
+	path := URLParamDecoded(r, "projectPath")
 	if path == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("project path requerido"))
+		WriteBadRequest(w, "project path requerido")
 		return
 	}
 
@@ -46,12 +42,11 @@ func (h *AnalyticsHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	analytics, err := h.analytics.GetProject(path, forceRefresh)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteInternalError(w, err.Error())
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(analytics))
+	WriteSuccess(w, analytics)
 }
 
 // Invalidate POST /api/analytics/invalidate
@@ -63,13 +58,11 @@ func (h *AnalyticsHandler) Invalidate(w http.ResponseWriter, r *http.Request) {
 
 	h.analytics.Invalidate(req.Project)
 
-	json.NewEncoder(w).Encode(SuccessResponse(map[string]string{
-		"message": "Cache invalidado",
-	}))
+	WriteSuccess(w, map[string]string{"message": "Cache invalidado"})
 }
 
 // GetCacheStatus GET /api/analytics/cache
 func (h *AnalyticsHandler) GetCacheStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.analytics.GetCacheStatus()
-	json.NewEncoder(w).Encode(SuccessResponse(status))
+	WriteSuccess(w, status)
 }

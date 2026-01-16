@@ -80,6 +80,88 @@ var (
 		},
 		[]string{"version"},
 	)
+
+	// Claude State metrics
+	claudeStateChanges = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_claude_state_changes_total",
+			Help: "Total Claude state transitions",
+		},
+		[]string{"from_state", "to_state"},
+	)
+
+	claudeStateGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "claude_monitor_claude_current_state",
+			Help: "Current Claude state per terminal (1=active)",
+		},
+		[]string{"terminal_id", "state"},
+	)
+
+	// PTY I/O metrics
+	ptyReadBytesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_pty_read_bytes_total",
+			Help: "Total bytes read from PTYs",
+		},
+	)
+
+	ptyWriteBytesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_pty_write_bytes_total",
+			Help: "Total bytes written to PTYs",
+		},
+	)
+
+	ptyReadOpsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_pty_read_operations_total",
+			Help: "Total PTY read operations",
+		},
+	)
+
+	ptyWriteOpsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_pty_write_operations_total",
+			Help: "Total PTY write operations",
+		},
+	)
+
+	// Permission metrics
+	permissionPromptsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_permission_prompts_total",
+			Help: "Total permission prompts by tool",
+		},
+		[]string{"tool"},
+	)
+
+	// Rate limiting metrics
+	rateLimitHitsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "claude_monitor_rate_limit_hits_total",
+			Help: "Total rate limit hits by IP",
+		},
+		[]string{"ip"},
+	)
+
+	// Health check metrics
+	healthCheckDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "claude_monitor_health_check_duration_seconds",
+			Help:    "Health check duration",
+			Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1},
+		},
+		[]string{"check"},
+	)
+
+	healthCheckStatus = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "claude_monitor_health_check_status",
+			Help: "Health check status (1=healthy, 0.5=degraded, 0=unhealthy)",
+		},
+		[]string{"check"},
+	)
 )
 
 // Init initializes metrics and registers them
@@ -93,6 +175,17 @@ func Init(version string) {
 		websocketMessagesTotal,
 		sessionOperationsTotal,
 		buildInfo,
+		// New metrics
+		claudeStateChanges,
+		claudeStateGauge,
+		ptyReadBytesTotal,
+		ptyWriteBytesTotal,
+		ptyReadOpsTotal,
+		ptyWriteOpsTotal,
+		permissionPromptsTotal,
+		rateLimitHitsTotal,
+		healthCheckDuration,
+		healthCheckStatus,
 	)
 
 	buildInfo.WithLabelValues(version).Set(1)
@@ -233,4 +326,78 @@ func (rw *responseWriter) Flush() {
 	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
+}
+
+// Claude State metrics
+
+// RecordClaudeStateChange records a Claude state transition
+func RecordClaudeStateChange(fromState, toState string) {
+	claudeStateChanges.WithLabelValues(fromState, toState).Inc()
+}
+
+// SetClaudeState sets the current state for a terminal
+func SetClaudeState(terminalID, state string) {
+	// Reset all states for this terminal
+	states := []string{"unknown", "waiting_input", "generating", "permission_prompt", "tool_running", "background_task", "error", "exited"}
+	for _, s := range states {
+		if s == state {
+			claudeStateGauge.WithLabelValues(terminalID, s).Set(1)
+		} else {
+			claudeStateGauge.WithLabelValues(terminalID, s).Set(0)
+		}
+	}
+}
+
+// ClearClaudeState clears state metrics for a terminal
+func ClearClaudeState(terminalID string) {
+	states := []string{"unknown", "waiting_input", "generating", "permission_prompt", "tool_running", "background_task", "error", "exited"}
+	for _, s := range states {
+		claudeStateGauge.DeleteLabelValues(terminalID, s)
+	}
+}
+
+// PTY I/O metrics
+
+// RecordPTYRead records bytes read from PTY
+func RecordPTYRead(bytes int) {
+	ptyReadBytesTotal.Add(float64(bytes))
+	ptyReadOpsTotal.Inc()
+}
+
+// RecordPTYWrite records bytes written to PTY
+func RecordPTYWrite(bytes int) {
+	ptyWriteBytesTotal.Add(float64(bytes))
+	ptyWriteOpsTotal.Inc()
+}
+
+// Permission metrics
+
+// RecordPermissionPrompt records a permission prompt event
+func RecordPermissionPrompt(tool string) {
+	permissionPromptsTotal.WithLabelValues(tool).Inc()
+}
+
+// Rate limiting metrics
+
+// RecordRateLimitHit records a rate limit hit
+func RecordRateLimitHit(ip string) {
+	rateLimitHitsTotal.WithLabelValues(ip).Inc()
+}
+
+// Health check metrics
+
+// RecordHealthCheck records health check duration and status
+func RecordHealthCheck(check string, duration time.Duration, status string) {
+	healthCheckDuration.WithLabelValues(check).Observe(duration.Seconds())
+
+	var statusValue float64
+	switch status {
+	case "healthy":
+		statusValue = 1.0
+	case "degraded":
+		statusValue = 0.5
+	default:
+		statusValue = 0.0
+	}
+	healthCheckStatus.WithLabelValues(check).Set(statusValue)
 }
