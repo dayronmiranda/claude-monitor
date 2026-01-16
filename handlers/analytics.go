@@ -30,11 +30,11 @@ func (h *AnalyticsHandler) GetGlobal(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, analytics)
 }
 
-// GetProject GET /api/analytics/projects/{projectPath}
-func (h *AnalyticsHandler) GetProject(w http.ResponseWriter, r *http.Request) {
-	path := URLParamDecoded(r, "projectPath")
+// GetSessionRoot GET /api/analytics/session-roots/{rootPath}
+func (h *AnalyticsHandler) GetSessionRoot(w http.ResponseWriter, r *http.Request) {
+	path := URLParamDecoded(r, "rootPath")
 	if path == "" {
-		WriteBadRequest(w, "project path requerido")
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -52,11 +52,11 @@ func (h *AnalyticsHandler) GetProject(w http.ResponseWriter, r *http.Request) {
 // Invalidate POST /api/analytics/invalidate
 func (h *AnalyticsHandler) Invalidate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Project string `json:"project"`
+		SessionRoot string `json:"session_root"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
-	h.analytics.Invalidate(req.Project)
+	h.analytics.Invalidate(req.SessionRoot)
 
 	WriteSuccess(w, map[string]string{"message": "Cache invalidado"})
 }

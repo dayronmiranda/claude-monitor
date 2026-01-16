@@ -22,12 +22,12 @@ func NewJobsHandler(jobService *services.JobService) *JobsHandler {
 }
 
 // ============================================================================
-// GET /api/projects/{projectPath}/jobs - Lista todos los jobs
+// GET /api/session-roots/{rootPath}/jobs - Lista todos los jobs
 // ============================================================================
 func (h *JobsHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
-	if projectPath == "" {
-		WriteBadRequest(w, "project path requerido")
+	rootPath := URLParamDecoded(r, "rootPath")
+	if rootPath == "" {
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -40,10 +40,10 @@ func (h *JobsHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	if state != "" {
 		// Filtrar por estado
 		jobState := services.JobState(state)
-		jobs, err = h.jobService.ListByState(projectPath, jobState)
+		jobs, err = h.jobService.ListByState(rootPath, jobState)
 	} else {
 		// Listar todos
-		jobs, err = h.jobService.List(projectPath)
+		jobs, err = h.jobService.List(rootPath)
 	}
 
 	if err != nil {
@@ -55,12 +55,12 @@ func (h *JobsHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs - Crear nuevo job
+// POST /api/session-roots/{rootPath}/jobs - Crear nuevo job
 // ============================================================================
 func (h *JobsHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
-	projectPath := URLParamDecoded(r, "projectPath")
-	if projectPath == "" {
-		WriteBadRequest(w, "project path requerido")
+	rootPath := URLParamDecoded(r, "rootPath")
+	if rootPath == "" {
+		WriteBadRequest(w, "root path requerido")
 		return
 	}
 
@@ -94,8 +94,8 @@ func (h *JobsHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Description: reqBody.Description,
 		WorkDir:     reqBody.WorkDir,
 		Type:        reqBody.Type,
-		ProjectPath: projectPath,
-		RealPath:    projectPath, // En producción: decodificar
+		ProjectPath: rootPath,
+		RealPath:    rootPath, // En producción: decodificar
 		Model:       reqBody.Model,
 	}
 
@@ -109,7 +109,7 @@ func (h *JobsHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// GET /api/projects/{projectPath}/jobs/{jobID} - Obtener info de un job
+// GET /api/session-roots/{rootPath}/jobs/{jobID} - Obtener info de un job
 // ============================================================================
 func (h *JobsHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -128,7 +128,7 @@ func (h *JobsHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// DELETE /api/projects/{projectPath}/jobs/{jobID} - Eliminar un job
+// DELETE /api/session-roots/{rootPath}/jobs/{jobID} - Eliminar un job
 // ============================================================================
 func (h *JobsHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -146,7 +146,7 @@ func (h *JobsHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/start - Iniciar un job
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/start - Iniciar un job
 // ============================================================================
 func (h *JobsHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -165,7 +165,7 @@ func (h *JobsHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/pause - Pausar un job
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/pause - Pausar un job
 // ============================================================================
 func (h *JobsHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -184,7 +184,7 @@ func (h *JobsHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/resume - Reanudar un job
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/resume - Reanudar un job
 // ============================================================================
 func (h *JobsHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -203,7 +203,7 @@ func (h *JobsHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/stop - Detener un job
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/stop - Detener un job
 // ============================================================================
 func (h *JobsHandler) StopJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -222,7 +222,7 @@ func (h *JobsHandler) StopJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/archive - Archivar un job
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/archive - Archivar un job
 // ============================================================================
 func (h *JobsHandler) ArchiveJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -241,7 +241,7 @@ func (h *JobsHandler) ArchiveJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/retry - Reintentar un job en ERROR
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/retry - Reintentar un job en ERROR
 // ============================================================================
 func (h *JobsHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -260,7 +260,7 @@ func (h *JobsHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// POST /api/projects/{projectPath}/jobs/{jobID}/discard - Descartar un job en ERROR
+// POST /api/session-roots/{rootPath}/jobs/{jobID}/discard - Descartar un job en ERROR
 // ============================================================================
 func (h *JobsHandler) DiscardJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -278,7 +278,7 @@ func (h *JobsHandler) DiscardJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// GET /api/projects/{projectPath}/jobs/{jobID}/messages - Obtener mensajes
+// GET /api/session-roots/{rootPath}/jobs/{jobID}/messages - Obtener mensajes
 // ============================================================================
 func (h *JobsHandler) GetJobMessages(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -306,7 +306,7 @@ func (h *JobsHandler) GetJobMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// GET /api/projects/{projectPath}/jobs/{jobID}/actions - Obtener acciones disponibles
+// GET /api/session-roots/{rootPath}/jobs/{jobID}/actions - Obtener acciones disponibles
 // ============================================================================
 func (h *JobsHandler) GetJobActions(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
@@ -334,7 +334,7 @@ func (h *JobsHandler) GetJobActions(w http.ResponseWriter, r *http.Request) {
 // BATCH OPERATIONS - Operaciones en lote
 // ============================================================================
 
-// BatchDeleteJobs POST /api/projects/{projectPath}/jobs/batch/delete
+// BatchDeleteJobs POST /api/session-roots/{rootPath}/jobs/batch/delete
 func (h *JobsHandler) BatchDeleteJobs(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
 		IDs []string `json:"ids"`
@@ -368,7 +368,7 @@ func (h *JobsHandler) BatchDeleteJobs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BatchJobAction POST /api/projects/{projectPath}/jobs/batch/action
+// BatchJobAction POST /api/session-roots/{rootPath}/jobs/batch/action
 func (h *JobsHandler) BatchJobAction(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
 		IDs    []string `json:"ids"`
