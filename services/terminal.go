@@ -675,7 +675,7 @@ func (s *TerminalService) Resize(id string, rows, cols uint16) error {
 
 	// Actualizar ClaudeScreen si existe
 	if terminal.ClaudeScreen != nil {
-		terminal.ClaudeScreen.ScreenState.Resize(int(cols), int(rows))
+		terminal.ClaudeScreen.Resize(int(cols), int(rows))
 	}
 
 	return nil

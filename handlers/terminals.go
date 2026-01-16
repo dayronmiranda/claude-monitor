@@ -309,7 +309,7 @@ func (h *TerminalsHandler) ListDir(w http.ResponseWriter, r *http.Request) {
 
 // Snapshot GET /api/terminals/{id}/snapshot
 func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/snapshot")
+	id := extractTerminalID(r.URL.Path)
 
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -329,7 +329,7 @@ func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 
 // ClaudeState GET /api/terminals/{id}/claude-state
 func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/claude-state")
+	id := extractTerminalID(r.URL.Path)
 
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -349,7 +349,7 @@ func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
 
 // ClaudeCheckpoints GET /api/terminals/{id}/checkpoints
 func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/checkpoints")
+	id := extractTerminalID(r.URL.Path)
 
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -369,7 +369,7 @@ func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Requ
 
 // ClaudeEvents GET /api/terminals/{id}/events
 func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/events")
+	id := extractTerminalID(r.URL.Path)
 
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -390,14 +390,10 @@ func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) 
 // extractTerminalID extrae el ID de terminal de la URL
 func extractTerminalID(urlPath string) string {
 	path := strings.TrimPrefix(urlPath, "/api/terminals/")
-	// Quitar sufijos de acciones
-	path = strings.TrimSuffix(path, "/kill")
-	path = strings.TrimSuffix(path, "/resume")
-	path = strings.TrimSuffix(path, "/resize")
-	path = strings.TrimSuffix(path, "/snapshot")
-	path = strings.TrimSuffix(path, "/claude-state")
-	path = strings.TrimSuffix(path, "/checkpoints")
-	path = strings.TrimSuffix(path, "/events")
-	path = strings.TrimSuffix(path, "/ws")
-	return path
+	// El ID es el primer segmento antes de cualquier acción
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
 }

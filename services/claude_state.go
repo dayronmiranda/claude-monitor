@@ -2,6 +2,7 @@ package services
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -478,9 +479,7 @@ func (h *ClaudeAwareScreenHandler) detectMetrics(content string) {
 	// Detectar tokens
 	tokenRe := regexp.MustCompile(`(?i)(\d+)\s*tokens?`)
 	if matches := tokenRe.FindStringSubmatch(content); len(matches) > 1 {
-		// Parsear número de tokens (simplificado)
-		var tokens int
-		if _, err := parseIntFromString(matches[1]); err == nil {
+		if tokens, err := parseIntFromString(matches[1]); err == nil {
 			h.stateInfo.TokensEstimated = tokens
 		}
 	}
@@ -488,8 +487,9 @@ func (h *ClaudeAwareScreenHandler) detectMetrics(content string) {
 	// Detectar costo
 	costRe := regexp.MustCompile(`\$(\d+\.?\d*)`)
 	if matches := costRe.FindStringSubmatch(content); len(matches) > 1 {
-		// Parsear costo (simplificado)
-		// h.stateInfo.CostEstimated = parsedCost
+		if cost, err := strconv.ParseFloat(matches[1], 64); err == nil {
+			h.stateInfo.CostEstimated = cost
+		}
 	}
 }
 
@@ -704,4 +704,11 @@ func (h *ClaudeAwareScreenHandler) IsGenerating() bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.stateInfo.IsGenerating
+}
+
+// Resize redimensiona la pantalla con thread-safety
+func (h *ClaudeAwareScreenHandler) Resize(width, height int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.ScreenState.Resize(width, height)
 }
