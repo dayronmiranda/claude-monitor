@@ -2,14 +2,18 @@ package main
 
 import (
 	"net/http"
-	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"claude-monitor/handlers"
+	"claude-monitor/pkg/metrics"
 	"claude-monitor/services"
 )
 
-// Router maneja el enrutamiento de la API
+// Router maneja el enrutamiento de la API usando Chi
 type Router struct {
+	chi       chi.Router
 	host      *handlers.HostHandler
 	projects  *handlers.ProjectsHandler
 	sessions  *handlers.SessionsHandler
@@ -28,6 +32,7 @@ func NewRouter(
 	allowedPathPrefixes []string,
 ) *Router {
 	return &Router{
+		chi:       chi.NewRouter(),
 		host:      handlers.NewHostHandler(hostName, version, claudeDir, terminals, claude),
 		projects:  handlers.NewProjectsHandler(claude, analytics),
 		sessions:  handlers.NewSessionsHandler(claude, terminals, analytics),
@@ -37,218 +42,122 @@ func NewRouter(
 	}
 }
 
-// SetupRoutes configura todas las rutas
-func (r *Router) SetupRoutes(mux *http.ServeMux) {
-	// Host
-	mux.HandleFunc("/api/host", r.routeHost)
-	mux.HandleFunc("/api/health", r.host.Health)
-	mux.HandleFunc("/api/ready", r.host.Ready)
-
-	// Projects
-	mux.HandleFunc("/api/projects", r.routeProjects)
-	mux.HandleFunc("/api/projects/", r.routeProjectsWithPath)
-
-	// Jobs (unified Sessions + Terminals)
-	handlers.RegisterJobsRoutes(mux, r.jobs)
-
-	// Terminals
-	mux.HandleFunc("/api/terminals", r.routeTerminals)
-	mux.HandleFunc("/api/terminals/", r.routeTerminalsWithID)
-
-	// Analytics
-	mux.HandleFunc("/api/analytics/global", r.analytics.GetGlobal)
-	mux.HandleFunc("/api/analytics/projects/", r.analytics.GetProject)
-	mux.HandleFunc("/api/analytics/invalidate", r.analytics.Invalidate)
-	mux.HandleFunc("/api/analytics/cache", r.analytics.GetCacheStatus)
-
-	// Filesystem
-	mux.HandleFunc("/api/filesystem/dir", r.terminals.ListDir)
+// Handler retorna el http.Handler configurado
+func (r *Router) Handler() http.Handler {
+	return r.chi
 }
 
-// routeHost enruta peticiones de host
-func (r *Router) routeHost(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		r.host.Get(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
+// SetupRoutes configura todas las rutas usando Chi
+func (r *Router) SetupRoutes() {
+	// Middleware global de Chi (recovery para evitar panics)
+	r.chi.Use(middleware.Recoverer)
+
+	// Rutas públicas (sin auth) - métricas y health
+	r.chi.Group(func(router chi.Router) {
+		router.Handle("/metrics", metrics.Handler())
+		router.Get("/api/health", r.host.Health)
+		router.Get("/api/ready", r.host.Ready)
+	})
+
+	// Rutas de API (con middlewares)
+	r.chi.Route("/api", func(api chi.Router) {
+		// Host info
+		api.Get("/host", r.host.Get)
+
+		// Projects
+		api.Route("/projects", func(projects chi.Router) {
+			projects.Get("/", r.projects.List)
+
+			// Rutas con path de proyecto
+			projects.Route("/{projectPath}", func(project chi.Router) {
+				project.Get("/", r.projects.Get)
+				project.Delete("/", r.projects.Delete)
+				project.Get("/activity", r.projects.GetActivity)
+
+				// Sessions dentro de proyecto
+				project.Route("/sessions", func(sessions chi.Router) {
+					sessions.Get("/", r.sessions.List)
+					sessions.Post("/delete", r.sessions.DeleteMultiple)
+					sessions.Post("/clean", r.sessions.CleanEmpty)
+					sessions.Post("/import", r.sessions.Import)
+
+					sessions.Route("/{sessionID}", func(session chi.Router) {
+						session.Get("/", r.sessions.Get)
+						session.Delete("/", r.sessions.Delete)
+						session.Put("/rename", r.sessions.Rename)
+						session.Get("/messages", r.sessions.GetMessages)
+						session.Get("/messages/realtime", r.sessions.GetRealTimeMessages)
+					})
+				})
+
+				// Jobs dentro de proyecto
+				project.Route("/jobs", func(jobsRouter chi.Router) {
+					jobsRouter.Get("/", r.jobs.ListJobs)
+					jobsRouter.Post("/", r.jobs.CreateJob)
+
+					jobsRouter.Route("/{jobID}", func(job chi.Router) {
+						job.Get("/", r.jobs.GetJob)
+						job.Delete("/", r.jobs.DeleteJob)
+
+						// Transiciones de estado
+						job.Post("/start", r.jobs.StartJob)
+						job.Post("/pause", r.jobs.PauseJob)
+						job.Post("/resume", r.jobs.ResumeJob)
+						job.Post("/stop", r.jobs.StopJob)
+						job.Post("/archive", r.jobs.ArchiveJob)
+
+						// Error handling
+						job.Post("/retry", r.jobs.RetryJob)
+						job.Post("/discard", r.jobs.DiscardJob)
+
+						// Info
+						job.Get("/messages", r.jobs.GetJobMessages)
+						job.Get("/actions", r.jobs.GetJobActions)
+					})
+				})
+			})
+		})
+
+		// Terminals
+		api.Route("/terminals", func(terms chi.Router) {
+			terms.Get("/", r.terminals.List)
+			terms.Post("/", r.terminals.Create)
+
+			terms.Route("/{terminalID}", func(term chi.Router) {
+				term.Get("/", r.terminals.Get)
+				term.Delete("/", r.terminals.Delete)
+
+				// WebSocket (sin middleware JSON)
+				term.Get("/ws", r.terminals.WebSocket)
+
+				// Operaciones
+				term.Post("/kill", r.terminals.Kill)
+				term.Post("/resume", r.terminals.Resume)
+				term.Post("/resize", r.terminals.Resize)
+
+				// Info
+				term.Get("/snapshot", r.terminals.Snapshot)
+				term.Get("/claude-state", r.terminals.ClaudeState)
+				term.Get("/checkpoints", r.terminals.ClaudeCheckpoints)
+				term.Get("/events", r.terminals.ClaudeEvents)
+			})
+		})
+
+		// Analytics
+		api.Route("/analytics", func(anal chi.Router) {
+			anal.Get("/global", r.analytics.GetGlobal)
+			anal.Get("/projects/{projectPath}", r.analytics.GetProject)
+			anal.Post("/invalidate", r.analytics.Invalidate)
+			anal.Get("/cache", r.analytics.GetCacheStatus)
+		})
+
+		// Filesystem
+		api.Get("/filesystem/dir", r.terminals.ListDir)
+	})
 }
 
-// routeProjects enruta peticiones de proyectos (sin path)
-func (r *Router) routeProjects(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		r.projects.List(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// routeProjectsWithPath enruta peticiones de proyectos con path
-func (r *Router) routeProjectsWithPath(w http.ResponseWriter, req *http.Request) {
-	path := strings.TrimPrefix(req.URL.Path, "/api/projects/")
-
-	// Detectar si es una ruta de sesiones
-	if strings.Contains(path, "/sessions") {
-		r.routeSessions(w, req)
-		return
-	}
-
-	// Detectar si es una ruta de actividad
-	if strings.HasSuffix(path, "/activity") {
-		r.projects.GetActivity(w, req)
-		return
-	}
-
-	// Es una petición de proyecto específico
-	switch req.Method {
-	case http.MethodGet:
-		r.projects.Get(w, req)
-	case http.MethodDelete:
-		r.projects.Delete(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// routeSessions enruta peticiones de sesiones
-func (r *Router) routeSessions(w http.ResponseWriter, req *http.Request) {
-	path := req.URL.Path
-
-	// POST /api/projects/{path}/sessions/delete
-	if strings.HasSuffix(path, "/sessions/delete") && req.Method == http.MethodPost {
-		r.sessions.DeleteMultiple(w, req)
-		return
-	}
-
-	// POST /api/projects/{path}/sessions/clean
-	if strings.HasSuffix(path, "/sessions/clean") && req.Method == http.MethodPost {
-		r.sessions.CleanEmpty(w, req)
-		return
-	}
-
-	// POST /api/projects/{path}/sessions/import
-	if strings.HasSuffix(path, "/sessions/import") && req.Method == http.MethodPost {
-		r.sessions.Import(w, req)
-		return
-	}
-
-	// PUT /api/projects/{path}/sessions/{id}/rename
-	if strings.HasSuffix(path, "/rename") && req.Method == http.MethodPut {
-		r.sessions.Rename(w, req)
-		return
-	}
-
-	// GET /api/projects/{path}/sessions/{id}/messages/realtime
-	if strings.HasSuffix(path, "/messages/realtime") && req.Method == http.MethodGet {
-		r.sessions.GetRealTimeMessages(w, req)
-		return
-	}
-
-	// GET /api/projects/{path}/sessions/{id}/messages
-	if strings.HasSuffix(path, "/messages") && req.Method == http.MethodGet {
-		r.sessions.GetMessages(w, req)
-		return
-	}
-
-	// Extraer si tiene ID de sesión
-	parts := strings.Split(path, "/sessions/")
-	hasSessionID := len(parts) == 2 && parts[1] != "" && !strings.Contains(parts[1], "/")
-
-	if hasSessionID {
-		// /api/projects/{path}/sessions/{id}
-		switch req.Method {
-		case http.MethodGet:
-			r.sessions.Get(w, req)
-		case http.MethodDelete:
-			r.sessions.Delete(w, req)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-		return
-	}
-
-	// /api/projects/{path}/sessions
-	switch req.Method {
-	case http.MethodGet:
-		r.sessions.List(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// routeTerminals enruta peticiones de terminales (sin ID)
-func (r *Router) routeTerminals(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		r.terminals.List(w, req)
-	case http.MethodPost:
-		r.terminals.Create(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// routeTerminalsWithID enruta peticiones de terminales con ID
-func (r *Router) routeTerminalsWithID(w http.ResponseWriter, req *http.Request) {
-	path := req.URL.Path
-
-	// WebSocket
-	if strings.HasSuffix(path, "/ws") {
-		r.terminals.WebSocket(w, req)
-		return
-	}
-
-	// POST /api/terminals/{id}/kill
-	if strings.HasSuffix(path, "/kill") && req.Method == http.MethodPost {
-		r.terminals.Kill(w, req)
-		return
-	}
-
-	// POST /api/terminals/{id}/resume
-	if strings.HasSuffix(path, "/resume") && req.Method == http.MethodPost {
-		r.terminals.Resume(w, req)
-		return
-	}
-
-	// POST /api/terminals/{id}/resize
-	if strings.HasSuffix(path, "/resize") && req.Method == http.MethodPost {
-		r.terminals.Resize(w, req)
-		return
-	}
-
-	// GET /api/terminals/{id}/snapshot
-	if strings.HasSuffix(path, "/snapshot") && req.Method == http.MethodGet {
-		r.terminals.Snapshot(w, req)
-		return
-	}
-
-	// GET /api/terminals/{id}/claude-state
-	if strings.HasSuffix(path, "/claude-state") && req.Method == http.MethodGet {
-		r.terminals.ClaudeState(w, req)
-		return
-	}
-
-	// GET /api/terminals/{id}/checkpoints
-	if strings.HasSuffix(path, "/checkpoints") && req.Method == http.MethodGet {
-		r.terminals.ClaudeCheckpoints(w, req)
-		return
-	}
-
-	// GET /api/terminals/{id}/events
-	if strings.HasSuffix(path, "/events") && req.Method == http.MethodGet {
-		r.terminals.ClaudeEvents(w, req)
-		return
-	}
-
-	// /api/terminals/{id}
-	switch req.Method {
-	case http.MethodGet:
-		r.terminals.Get(w, req)
-	case http.MethodDelete:
-		r.terminals.Delete(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
+// GetURLParam obtiene un parámetro de URL de Chi
+// Wrapper para facilitar migración de handlers
+func GetURLParam(r *http.Request, key string) string {
+	return chi.URLParam(r, key)
 }

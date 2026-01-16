@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"claude-monitor/middleware"
 	"claude-monitor/pkg/logger"
 	"claude-monitor/pkg/metrics"
 	"claude-monitor/services"
@@ -104,7 +105,7 @@ func main() {
 		log.Warn("Error cargando jobs del disco", "error", err)
 	}
 
-	// Crear router
+	// Crear router con Chi
 	router := NewRouter(
 		claudeService,
 		terminalService,
@@ -116,22 +117,30 @@ func main() {
 		cfg.AllowedPathPrefixes,
 	)
 
-	// Crear mux y configurar rutas
-	mux := http.NewServeMux()
-	router.SetupRoutes(mux)
+	// Configurar rutas
+	router.SetupRoutes()
 
-	// Endpoint de métricas (sin auth)
-	mux.Handle("/metrics", metrics.Handler())
+	// Construir cadena de middlewares
+	middlewares := []func(http.Handler) http.Handler{}
 
-	// Aplicar middlewares (orden: metrics -> logging -> cors -> auth -> json)
-	handler := ChainMiddleware(
-		mux,
+	// Rate limiting (si está habilitado)
+	if cfg.RateLimitEnabled {
+		rateLimiter := middleware.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+		middlewares = append(middlewares, rateLimiter.Middleware)
+		log.Info("Rate limiting habilitado", "rps", cfg.RateLimitRPS, "burst", cfg.RateLimitBurst)
+	}
+
+	// Middlewares estándar (orden: rate_limit -> metrics -> logging -> cors -> auth -> json)
+	middlewares = append(middlewares,
 		metrics.MetricsMiddleware,
 		LoggingMiddleware,
 		CORSMiddleware,
 		AuthMiddleware,
 		JSONMiddleware,
 	)
+
+	// Aplicar middlewares (Chi ya tiene recoverer)
+	handler := ChainMiddleware(router.Handler(), middlewares...)
 
 	// Crear servidor HTTP con configuración
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
@@ -177,7 +186,7 @@ func main() {
 	gracefulShutdown(log, server, terminalService, time.Duration(shutdownTimeout)*time.Second)
 }
 
-// gracefulShutdown realiza un shutdown ordenado
+// gracefulShutdown realiza un shutdown ordenado sin usar time.Sleep
 func gracefulShutdown(log *logger.Logger, server *http.Server, terminalService *services.TerminalService, timeout time.Duration) {
 	// Crear context con timeout
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -185,22 +194,34 @@ func gracefulShutdown(log *logger.Logger, server *http.Server, terminalService *
 
 	log.Info("Iniciando graceful shutdown", "timeout", timeout.String())
 
-	// 1. Terminar todas las terminales activas
-	log.Info("Terminando terminales activas")
-	terminalService.ShutdownAll()
+	// Canal para coordinar pasos de shutdown
+	done := make(chan struct{})
 
-	// 2. Dar tiempo para que los clientes reciban notificación
-	time.Sleep(500 * time.Millisecond)
+	go func() {
+		// 1. Terminar todas las terminales activas (ahora usa channels internamente)
+		log.Info("Terminando terminales activas")
+		terminalService.ShutdownAllWithTimeout(timeout / 2) // Usar mitad del timeout para terminales
+
+		// 2. Persistir estado final
+		log.Info("Persistiendo estado final")
+		terminalService.PersistState()
+
+		close(done)
+	}()
+
+	// Esperar terminación de terminales o timeout
+	select {
+	case <-done:
+		log.Debug("Terminales cerradas correctamente")
+	case <-ctx.Done():
+		log.Warn("Timeout esperando cierre de terminales")
+	}
 
 	// 3. Shutdown del servidor HTTP (deja de aceptar nuevas conexiones)
 	log.Info("Cerrando servidor HTTP")
 	if err := server.Shutdown(ctx); err != nil {
 		log.Error("Error en shutdown del servidor", "error", err)
 	}
-
-	// 4. Persistir estado final
-	log.Info("Persistiendo estado final")
-	terminalService.PersistState()
 
 	log.Info("Shutdown completado")
 }

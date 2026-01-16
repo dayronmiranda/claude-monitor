@@ -81,95 +81,77 @@ func (h *TerminalsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	WriteCreated(w, terminal)
 }
 
-// Get GET /api/terminals/{id}
+// Get GET /api/terminals/{terminalID}
 func (h *TerminalsHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	terminal, err := h.terminals.Get(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(terminal))
+	WriteSuccess(w, terminal)
 }
 
-// Delete DELETE /api/terminals/{id}
+// Delete DELETE /api/terminals/{terminalID}
 func (h *TerminalsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	if err := h.terminals.Delete(id); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteBadRequest(w, err.Error())
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(map[string]string{
-		"message": "Terminal eliminada",
-	}))
+	WriteSuccess(w, map[string]string{"message": "Terminal eliminada"})
 }
 
-// Kill POST /api/terminals/{id}/kill
+// Kill POST /api/terminals/{terminalID}/kill
 func (h *TerminalsHandler) Kill(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/kill")
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	if err := h.terminals.Kill(id); err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(map[string]string{
-		"message": "Terminal terminada",
-	}))
+	WriteSuccess(w, map[string]string{"message": "Terminal terminada"})
 }
 
-// Resume POST /api/terminals/{id}/resume
+// Resume POST /api/terminals/{terminalID}/resume
 func (h *TerminalsHandler) Resume(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/resume")
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	terminal, err := h.terminals.Resume(id)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteInternalError(w, err.Error())
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(terminal))
+	WriteSuccess(w, terminal)
 }
 
-// Resize POST /api/terminals/{id}/resize
+// Resize POST /api/terminals/{terminalID}/resize
 func (h *TerminalsHandler) Resize(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/resize")
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
@@ -178,26 +160,21 @@ func (h *TerminalsHandler) Resize(w http.ResponseWriter, r *http.Request) {
 		Cols uint16 `json:"cols"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("JSON invalido"))
+		WriteBadRequest(w, "JSON invalido")
 		return
 	}
 
 	if err := h.terminals.Resize(id, req.Rows, req.Cols); err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(map[string]string{
-		"message": "Terminal redimensionada",
-	}))
+	WriteSuccess(w, map[string]string{"message": "Terminal redimensionada"})
 }
 
-// WebSocket GET /api/terminals/{id}/ws
+// WebSocket GET /api/terminals/{terminalID}/ws
 func (h *TerminalsHandler) WebSocket(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(extractTerminalID(r.URL.Path), "/ws")
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
 		http.Error(w, "terminal id requerido", http.StatusBadRequest)
 		return
@@ -307,93 +284,70 @@ func (h *TerminalsHandler) ListDir(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
-// Snapshot GET /api/terminals/{id}/snapshot
+// Snapshot GET /api/terminals/{terminalID}/snapshot
 func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	snapshot, err := h.terminals.GetSnapshot(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(snapshot))
+	WriteSuccess(w, snapshot)
 }
 
-// ClaudeState GET /api/terminals/{id}/claude-state
+// ClaudeState GET /api/terminals/{terminalID}/claude-state
 func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	state, err := h.terminals.GetClaudeState(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
-	json.NewEncoder(w).Encode(SuccessResponse(state))
+	WriteSuccess(w, state)
 }
 
-// ClaudeCheckpoints GET /api/terminals/{id}/checkpoints
+// ClaudeCheckpoints GET /api/terminals/{terminalID}/checkpoints
 func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	checkpoints, err := h.terminals.GetClaudeCheckpoints(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
 	json.NewEncoder(w).Encode(SuccessWithMeta(checkpoints, &APIMeta{Total: len(checkpoints)}))
 }
 
-// ClaudeEvents GET /api/terminals/{id}/events
+// ClaudeEvents GET /api/terminals/{terminalID}/events
 func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) {
-	id := extractTerminalID(r.URL.Path)
-
+	id := URLParam(r, "terminalID")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse("terminal id requerido"))
+		WriteBadRequest(w, "terminal id requerido")
 		return
 	}
 
 	events, err := h.terminals.GetClaudeEvents(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse(err.Error()))
+		WriteNotFound(w, "terminal")
 		return
 	}
 
 	json.NewEncoder(w).Encode(SuccessWithMeta(events, &APIMeta{Total: len(events)}))
-}
-
-// extractTerminalID extrae el ID de terminal de la URL
-func extractTerminalID(urlPath string) string {
-	path := strings.TrimPrefix(urlPath, "/api/terminals/")
-	// El ID es el primer segmento antes de cualquier acción
-	parts := strings.Split(path, "/")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return ""
 }
