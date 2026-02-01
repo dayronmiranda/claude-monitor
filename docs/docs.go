@@ -1058,19 +1058,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.MoveSessionResult"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/handlers.APIResponse"
                         }
                     },
                     "400": {
@@ -2366,29 +2354,6 @@ const docTemplate = `{
                 },
                 "total_user_messages": {
                     "type": "integer"
-                }
-            }
-        },
-        "services.MoveSessionResult": {
-            "type": "object",
-            "properties": {
-                "new_project_path": {
-                    "type": "string"
-                },
-                "new_real_path": {
-                    "type": "string"
-                },
-                "old_project_path": {
-                    "type": "string"
-                },
-                "old_real_path": {
-                    "type": "string"
-                },
-                "paths_replaced": {
-                    "type": "integer"
-                },
-                "session_id": {
-                    "type": "string"
                 }
             }
         },

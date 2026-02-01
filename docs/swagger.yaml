@@ -205,21 +205,6 @@ definitions:
       total_user_messages:
         type: integer
     type: object
-  services.MoveSessionResult:
-    properties:
-      new_project_path:
-        type: string
-      new_real_path:
-        type: string
-      old_project_path:
-        type: string
-      old_real_path:
-        type: string
-      paths_replaced:
-        type: integer
-      session_id:
-        type: string
-    type: object
   services.ProjectAnalytics:
     properties:
       cached_until:
@@ -927,12 +912,7 @@ paths:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.MoveSessionResult'
-              type: object
+            $ref: '#/definitions/handlers.APIResponse'
         "400":
           description: Bad Request
           schema:

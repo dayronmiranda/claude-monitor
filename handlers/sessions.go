@@ -377,7 +377,7 @@ func (h *SessionsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 // @Param        rootPath   path      string                    true  "Path del session-root actual (URL encoded)"
 // @Param        sessionID  path      string                    true  "ID de la sesión"
 // @Param        request    body      object{new_path=string}   true  "Nueva ruta absoluta del proyecto"
-// @Success      200        {object}  handlers.APIResponse{data=services.MoveSessionResult}
+// @Success      200        {object}  handlers.APIResponse
 // @Failure      400        {object}  handlers.APIResponse
 // @Failure      404        {object}  handlers.APIResponse
 // @Failure      409        {object}  handlers.APIResponse
@@ -406,8 +406,7 @@ func (h *SessionsHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.claude.MoveSession(rootPath, sessionID, req.NewPath)
-	if err != nil {
+	if err := h.claude.MoveSession(rootPath, sessionID, req.NewPath); err != nil {
 		if err == os.ErrInvalid {
 			WriteBadRequest(w, "new_path debe ser una ruta absoluta")
 			return
@@ -424,9 +423,9 @@ func (h *SessionsHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invalidar cache de analytics para ambos proyectos
-	h.analytics.Invalidate(result.OldProjectPath)
-	h.analytics.Invalidate(result.NewProjectPath)
+	// Invalidar cache
+	h.analytics.Invalidate(rootPath)
+	h.analytics.Invalidate(services.EncodeProjectPath(req.NewPath))
 
-	WriteSuccess(w, result)
+	WriteSuccess(w, nil)
 }
