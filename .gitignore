@@ -20,3 +20,6 @@ terminals.json
 .vscode/
 .idea/
 *.swp
+
+# Runtime data
+jobs/
