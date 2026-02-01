@@ -21,7 +21,7 @@ import (
 
 // TerminalService gestiona las terminales PTY
 type TerminalService struct {
-	terminals           map[string]*Terminal
+	terminals           map[string]Terminal // Interface Terminal
 	mu                  sync.RWMutex
 	saved               map[string]*SavedTerminal
 	savedMu             sync.RWMutex
@@ -30,36 +30,19 @@ type TerminalService struct {
 	allowedPathPrefixes []string
 }
 
-// Terminal representa una terminal PTY activa
-type Terminal struct {
-	ID        string                   `json:"id"`
-	Name      string                   `json:"name"`
-	WorkDir   string                   `json:"work_dir"`
-	SessionID string                   `json:"session_id,omitempty"`
-	Status    string                   `json:"status"`
-	Type      string                   `json:"type"` // "claude" o "terminal"
-	StartedAt time.Time                `json:"started_at"`
-	Cmd       *exec.Cmd                `json:"-"`
-	Pty       PTY                      `json:"-"` // Interfaz PTY cross-platform
-	Clients   map[*websocket.Conn]bool `json:"-"`
-	ClientsMu sync.RWMutex             `json:"-"`
-	Config    TerminalConfig           `json:"-"`
-	Screen    *ScreenState             `json:"-"` // Estado de pantalla virtual (go-ansiterm)
-	ClaudeScreen *ClaudeAwareScreenHandler `json:"-"` // Estado extendido para terminales Claude
-}
-
 // SavedTerminal terminal guardada para persistencia
 type SavedTerminal struct {
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	WorkDir      string         `json:"work_dir"`
-	SessionID    string         `json:"session_id,omitempty"`
-	Type         string         `json:"type"`
-	Model        string         `json:"model,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	LastAccessAt time.Time      `json:"last_access_at"`
-	Status       string         `json:"status"`
-	Config       TerminalConfig `json:"config"`
+	ID           string              `json:"id"`
+	Name         string              `json:"name"`
+	WorkDir      string              `json:"work_dir"`
+	SessionID    string              `json:"session_id,omitempty"`
+	Type         string              `json:"type"`
+	Model        string              `json:"model,omitempty"`
+	CreatedAt    time.Time           `json:"created_at"`
+	LastAccessAt time.Time           `json:"last_access_at"`
+	Status       string              `json:"status"`
+	Config       TerminalConfig      `json:"config"`
+	ClaudeState  *ClaudeStateSnapshot `json:"claude_state,omitempty"` // Estado Claude extendido
 }
 
 // TerminalConfig configuración para crear terminal
@@ -82,19 +65,20 @@ type TerminalConfig struct {
 
 // TerminalInfo información de terminal para API
 type TerminalInfo struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	WorkDir      string    `json:"work_dir"`
-	SessionID    string    `json:"session_id,omitempty"`
-	Type         string    `json:"type"`
-	Status       string    `json:"status"`
-	Model        string    `json:"model,omitempty"`
-	Active       bool      `json:"active"`
-	Clients      int       `json:"clients"`
-	CanResume    bool      `json:"can_resume"`
-	StartedAt    time.Time `json:"started_at,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
-	LastAccessAt time.Time `json:"last_access_at,omitempty"`
+	ID           string              `json:"id"`
+	Name         string              `json:"name"`
+	WorkDir      string              `json:"work_dir"`
+	SessionID    string              `json:"session_id,omitempty"`
+	Type         string              `json:"type"`
+	Status       string              `json:"status"`
+	Model        string              `json:"model,omitempty"`
+	Active       bool                `json:"active"`
+	Clients      int                 `json:"clients"`
+	CanResume    bool                `json:"can_resume"`
+	StartedAt    time.Time           `json:"started_at,omitempty"`
+	CreatedAt    time.Time           `json:"created_at,omitempty"`
+	LastAccessAt time.Time           `json:"last_access_at,omitempty"`
+	ClaudeState  *ClaudeStateSnapshot `json:"claude_state,omitempty"` // Solo para tipo claude
 }
 
 // DirectoryEntry entrada de directorio
@@ -109,7 +93,7 @@ type DirectoryEntry struct {
 func NewTerminalService(dataDir string, allowedPathPrefixes ...string) *TerminalService {
 	sessionsFile := filepath.Join(dataDir, "terminals.json")
 	ts := &TerminalService{
-		terminals:           make(map[string]*Terminal),
+		terminals:           make(map[string]Terminal),
 		saved:               make(map[string]*SavedTerminal),
 		sessionsFile:        sessionsFile,
 		allowedPathPrefixes: allowedPathPrefixes,
@@ -166,7 +150,6 @@ func (s *TerminalService) persistSaved() {
 		return
 	}
 
-	// Escritura atómica: escribir a archivo temporal y renombrar
 	if err := atomicWriteFile(s.sessionsFile, data, 0600); err != nil {
 		logger.Error("Error guardando terminales", "error", err)
 	}
@@ -174,23 +157,19 @@ func (s *TerminalService) persistSaved() {
 
 // atomicWriteFile escribe un archivo de forma atómica
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	// Crear archivo temporal en el mismo directorio
 	tmpPath := path + ".tmp"
 
-	// Escribir al archivo temporal
 	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
 
-	// Escribir datos
 	if _, err := f.Write(data); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
 		return err
 	}
 
-	// Sync para asegurar que los datos están en disco
 	if err := f.Sync(); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
@@ -202,7 +181,6 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 
-	// Rename atómico
 	return os.Rename(tmpPath, path)
 }
 
@@ -211,26 +189,21 @@ type PathValidator func(path string) error
 
 // ValidatePath verifica que un path sea válido y esté en prefijos permitidos
 func ValidatePath(path string, allowedPrefixes []string) error {
-	// Limpiar el path
 	cleaned := filepath.Clean(path)
 
-	// Debe ser absoluto
 	if !filepath.IsAbs(cleaned) {
 		return fmt.Errorf("path debe ser absoluto: %s", path)
 	}
 
-	// Detectar path traversal
 	if strings.Contains(path, "..") {
 		logger.Warn("Intento de path traversal detectado", "path", path)
 		return fmt.Errorf("path traversal no permitido")
 	}
 
-	// Si no hay prefijos configurados, permitir todos
 	if len(allowedPrefixes) == 0 {
 		return nil
 	}
 
-	// Verificar que está dentro de los prefijos permitidos
 	for _, prefix := range allowedPrefixes {
 		if strings.HasPrefix(cleaned, filepath.Clean(prefix)) {
 			return nil
@@ -343,7 +316,7 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	}
 	s.mu.RUnlock()
 
-	// Construir comando (cross-platform)
+	// Construir comando
 	var cmd *exec.Cmd
 	if cfg.Type == "terminal" {
 		shell := GetDefaultShell()
@@ -361,40 +334,40 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	cmd.Dir = cfg.WorkDir
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
-	// Iniciar PTY (cross-platform: Unix usa creack/pty, Windows usa ConPTY)
+	// Iniciar PTY
 	starter := NewPTYStarter()
 	ptyInstance, err := starter.Start(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("error iniciando PTY: %v", err)
 	}
 
-	terminal := &Terminal{
-		ID:        cfg.ID,
-		Name:      cfg.Name,
-		WorkDir:   cfg.WorkDir,
-		SessionID: cfg.ID,
-		Status:    "running",
-		Type:      cfg.Type,
-		StartedAt: time.Now(),
-		Cmd:       cmd,
-		Pty:       ptyInstance,
-		Clients:   make(map[*websocket.Conn]bool),
-		Config:    cfg,
-		Screen:    NewScreenState(80, 24), // Pantalla virtual para tracking de estado
-	}
-
-	// Para terminales de tipo "claude", usar ClaudeAwareScreenHandler
+	// Crear terminal según tipo
+	var terminal Terminal
 	if cfg.Type == "claude" {
-		terminal.ClaudeScreen = NewClaudeAwareScreenHandler(80, 24)
-		logger.Debug("ClaudeAwareScreenHandler inicializado", "terminal_id", cfg.ID)
+		tc := NewTerminalClaude(cfg.ID, cfg.Name, cfg.WorkDir, cfg)
+		tc.SetCmd(cmd)
+		tc.SetPty(ptyInstance)
+		tc.SetScreen(NewScreenState(80, 24))
+		tc.SetClaudeScreen(NewClaudeAwareScreenHandler(80, 24))
+		tc.MarkActive()
+		terminal = tc
+
+		// Configurar callbacks
+		s.setupClaudeCallbacksNew(tc)
+		logger.Debug("TerminalClaude creada", "terminal_id", cfg.ID)
+	} else {
+		tr := NewTerminalRaw(cfg.ID, cfg.Name, cfg.WorkDir, cfg)
+		tr.SetCmd(cmd)
+		tr.SetPty(ptyInstance)
+		tr.SetScreen(NewScreenState(80, 24))
+		tr.Start()
+		terminal = tr
+		logger.Debug("TerminalRaw creada", "terminal_id", cfg.ID)
 	}
 
 	s.mu.Lock()
 	s.terminals[cfg.ID] = terminal
 	s.mu.Unlock()
-
-	// Configurar callbacks de eventos de Claude (después de añadir a terminals)
-	s.setupClaudeCallbacks(terminal)
 
 	// Guardar
 	s.savedMu.Lock()
@@ -414,70 +387,54 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	s.persistSaved()
 
 	// Goroutine para leer output
-	go s.readLoop(terminal)
+	go s.readLoopNew(terminal)
 
 	// Goroutine para detectar terminación
 	go func() {
 		cmd.Wait()
-		s.cleanup(terminal)
+		s.cleanupNew(terminal)
 	}()
 
 	logger.Get().Terminal("created", cfg.ID, "name", cfg.Name, "work_dir", cfg.WorkDir, "type", cfg.Type)
 
-	return s.toTerminalInfo(terminal, true), nil
+	return s.toTerminalInfoNew(terminal, true), nil
 }
 
-// readLoop lee output del PTY
-func (s *TerminalService) readLoop(t *Terminal) {
+// readLoopNew lee output del PTY usando interface
+func (s *TerminalService) readLoopNew(t Terminal) {
+	pty := t.GetPty()
+	if pty == nil {
+		return
+	}
+
 	buf := make([]byte, 4096)
 	for {
-		n, err := t.Pty.Read(buf)
+		n, err := pty.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				logger.Error("Error leyendo PTY", "terminal_id", t.ID, "error", err)
+				logger.Error("Error leyendo PTY", "terminal_id", t.GetID(), "error", err)
 			}
 			break
 		}
 
-		// Alimentar el estado de pantalla virtual con go-ansiterm
-		if t.Screen != nil {
-			if feedErr := t.Screen.Feed(buf[:n]); feedErr != nil {
-				logger.Debug("Error feeding screen state", "terminal_id", t.ID, "error", feedErr)
-			}
+		// Alimentar screen según tipo
+		switch term := t.(type) {
+		case *TerminalRaw:
+			term.FeedScreen(buf[:n])
+		case *TerminalClaude:
+			term.FeedScreen(buf[:n])
 		}
 
-		// Para terminales Claude, alimentar también el ClaudeAwareScreenHandler
-		if t.ClaudeScreen != nil {
-			if feedErr := t.ClaudeScreen.Feed(buf[:n]); feedErr != nil {
-				logger.Debug("Error feeding claude screen state", "terminal_id", t.ID, "error", feedErr)
-			}
-		}
-
-		s.broadcast(t, buf[:n])
-	}
-}
-
-// broadcast envía datos a todos los clientes
-func (s *TerminalService) broadcast(t *Terminal, data []byte) {
-	t.ClientsMu.RLock()
-	defer t.ClientsMu.RUnlock()
-
-	msg := map[string]string{
-		"type": "output",
-		"data": string(data),
-	}
-
-	for client := range t.Clients {
-		client.WriteJSON(msg)
+		t.Broadcast(buf[:n])
 	}
 }
 
 // ClaudeEventMessage representa un mensaje de evento de Claude enviado via WebSocket
 type ClaudeEventMessage struct {
-	Type      string      `json:"type"`       // Tipo principal: "claude:event"
-	EventType string      `json:"event_type"` // Subtipo: state, permission, command, checkpoint, tool
-	Data      interface{} `json:"data"`       // Datos del evento
-	Timestamp time.Time   `json:"timestamp"`  // Timestamp del evento
+	Type      string      `json:"type"`
+	EventType string      `json:"event_type"`
+	Data      interface{} `json:"data"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 // StateChangeData datos de cambio de estado
@@ -500,111 +457,96 @@ type SlashCommandData struct {
 // ToolUseData datos de uso de herramienta
 type ToolUseData struct {
 	Tool  string `json:"tool"`
-	Phase string `json:"phase"` // "pre" o "post"
+	Phase string `json:"phase"`
 }
 
-// broadcastClaudeEvent envía un evento de Claude a todos los clientes
-func (s *TerminalService) broadcastClaudeEvent(t *Terminal, eventType string, data interface{}) {
-	t.ClientsMu.RLock()
-	defer t.ClientsMu.RUnlock()
-
-	msg := ClaudeEventMessage{
-		Type:      "claude:event",
-		EventType: eventType,
-		Data:      data,
-		Timestamp: time.Now(),
-	}
-
-	for client := range t.Clients {
-		if err := client.WriteJSON(msg); err != nil {
-			logger.Debug("Error enviando evento claude", "error", err, "event_type", eventType)
-		}
-	}
-}
-
-// setupClaudeCallbacks configura los callbacks para eventos de Claude
-func (s *TerminalService) setupClaudeCallbacks(terminal *Terminal) {
-	if terminal.ClaudeScreen == nil {
+// setupClaudeCallbacksNew configura callbacks para TerminalClaude
+func (s *TerminalService) setupClaudeCallbacksNew(tc *TerminalClaude) {
+	cs := tc.GetClaudeScreen()
+	if cs == nil {
 		return
 	}
 
-	// Callback para cambio de estado
-	terminal.ClaudeScreen.OnStateChange = func(old, new ClaudeState) {
-		logger.Debug("Claude state change", "terminal_id", terminal.ID, "old", old, "new", new)
-		s.broadcastClaudeEvent(terminal, "state", StateChangeData{
+	cs.OnStateChange = func(old, new ClaudeState) {
+		logger.Debug("Claude state change", "terminal_id", tc.GetID(), "old", old, "new", new)
+		tc.BroadcastClaudeEvent("state", StateChangeData{
 			OldState: string(old),
 			NewState: string(new),
 		})
 	}
 
-	// Callback para solicitud de permiso
-	terminal.ClaudeScreen.OnPermissionPrompt = func(tool string) {
-		logger.Debug("Claude permission prompt", "terminal_id", terminal.ID, "tool", tool)
-		s.broadcastClaudeEvent(terminal, "permission", PermissionData{
-			Tool: tool,
-		})
+	cs.OnPermissionPrompt = func(tool string) {
+		logger.Debug("Claude permission prompt", "terminal_id", tc.GetID(), "tool", tool)
+		tc.BroadcastClaudeEvent("permission", PermissionData{Tool: tool})
 	}
 
-	// Callback para slash commands
-	terminal.ClaudeScreen.OnSlashCommand = func(cmd string, args string) {
-		logger.Debug("Claude slash command", "terminal_id", terminal.ID, "command", cmd, "args", args)
-		s.broadcastClaudeEvent(terminal, "command", SlashCommandData{
-			Command: cmd,
-			Args:    args,
-		})
+	cs.OnSlashCommand = func(cmd string, args string) {
+		logger.Debug("Claude slash command", "terminal_id", tc.GetID(), "command", cmd, "args", args)
+		tc.BroadcastClaudeEvent("command", SlashCommandData{Command: cmd, Args: args})
 	}
 
-	// Callback para checkpoints
-	terminal.ClaudeScreen.OnCheckpoint = func(cp Checkpoint) {
-		logger.Debug("Claude checkpoint", "terminal_id", terminal.ID, "checkpoint_id", cp.ID)
-		s.broadcastClaudeEvent(terminal, "checkpoint", cp)
+	cs.OnCheckpoint = func(cp Checkpoint) {
+		logger.Debug("Claude checkpoint", "terminal_id", tc.GetID(), "checkpoint_id", cp.ID)
+		tc.BroadcastClaudeEvent("checkpoint", cp)
 	}
 
-	// Callback para uso de herramientas
-	terminal.ClaudeScreen.OnToolUse = func(tool string, phase string) {
-		logger.Debug("Claude tool use", "terminal_id", terminal.ID, "tool", tool, "phase", phase)
-		s.broadcastClaudeEvent(terminal, "tool", ToolUseData{
-			Tool:  tool,
-			Phase: phase,
-		})
+	cs.OnToolUse = func(tool string, phase string) {
+		logger.Debug("Claude tool use", "terminal_id", tc.GetID(), "tool", tool, "phase", phase)
+		tc.BroadcastClaudeEvent("tool", ToolUseData{Tool: tool, Phase: phase})
 	}
 }
 
-// cleanup limpia recursos de una terminal
-func (s *TerminalService) cleanup(t *Terminal) {
-	t.ClientsMu.Lock()
-	for client := range t.Clients {
+// cleanupNew limpia recursos de una terminal
+func (s *TerminalService) cleanupNew(t Terminal) {
+	// Notificar y cerrar clientes
+	clients := make(map[*websocket.Conn]bool)
+	switch term := t.(type) {
+	case *TerminalRaw:
+		clients = term.GetClients()
+		term.ClearClients()
+	case *TerminalClaude:
+		clients = term.GetClients()
+		term.ClearClients()
+	}
+
+	for client := range clients {
 		client.WriteJSON(map[string]string{
 			"type":    "closed",
 			"message": "Terminal terminada",
 		})
 		client.Close()
 	}
-	t.Clients = make(map[*websocket.Conn]bool)
-	t.ClientsMu.Unlock()
 
-	if t.Pty != nil {
-		t.Pty.Close()
+	// Cerrar PTY
+	if pty := t.GetPty(); pty != nil {
+		pty.Close()
 	}
 
+	id := t.GetID()
+
 	s.mu.Lock()
-	delete(s.terminals, t.ID)
+	delete(s.terminals, id)
 	s.mu.Unlock()
 
-	// Actualizar estado
+	// Actualizar estado guardado
 	s.savedMu.Lock()
-	if saved, ok := s.saved[t.ID]; ok {
+	if saved, ok := s.saved[id]; ok {
 		saved.Status = "stopped"
 		saved.LastAccessAt = time.Now()
+
+		// Guardar estado Claude si aplica
+		if tc, ok := t.(*TerminalClaude); ok {
+			saved.ClaudeState = tc.GetClaudeStateSnapshot()
+		}
 	}
 	s.savedMu.Unlock()
 	s.persistSaved()
 
 	if s.onTerminalEnd != nil {
-		s.onTerminalEnd(t.ID)
+		s.onTerminalEnd(id)
 	}
 
-	logger.Get().Terminal("terminated", t.ID)
+	logger.Get().Terminal("terminated", id)
 }
 
 // List lista todas las terminales
@@ -615,8 +557,8 @@ func (s *TerminalService) List() []TerminalInfo {
 	s.mu.RLock()
 	activeIDs := make(map[string]bool)
 	for _, t := range s.terminals {
-		activeIDs[t.ID] = true
-		list = append(list, *s.toTerminalInfo(t, true))
+		activeIDs[t.GetID()] = true
+		list = append(list, *s.toTerminalInfoNew(t, true))
 	}
 	s.mu.RUnlock()
 
@@ -636,6 +578,7 @@ func (s *TerminalService) List() []TerminalInfo {
 				CanResume:    t.Type == "claude",
 				CreatedAt:    t.CreatedAt,
 				LastAccessAt: t.LastAccessAt,
+				ClaudeState:  t.ClaudeState,
 			})
 		}
 	}
@@ -650,7 +593,7 @@ func (s *TerminalService) Get(id string) (*TerminalInfo, error) {
 	s.mu.RLock()
 	if t, ok := s.terminals[id]; ok {
 		s.mu.RUnlock()
-		return s.toTerminalInfo(t, true), nil
+		return s.toTerminalInfoNew(t, true), nil
 	}
 	s.mu.RUnlock()
 
@@ -670,6 +613,7 @@ func (s *TerminalService) Get(id string) (*TerminalInfo, error) {
 			CanResume:    t.Type == "claude",
 			CreatedAt:    t.CreatedAt,
 			LastAccessAt: t.LastAccessAt,
+			ClaudeState:  t.ClaudeState,
 		}, nil
 	}
 	s.savedMu.RUnlock()
@@ -703,13 +647,11 @@ func (s *TerminalService) Kill(id string) error {
 		return fmt.Errorf("terminal no encontrada o no activa: %s", id)
 	}
 
-	signaler := NewProcessSignaler()
-	return signaler.Terminate(terminal.Cmd)
+	return terminal.Kill()
 }
 
 // Delete elimina una terminal guardada
 func (s *TerminalService) Delete(id string) error {
-	// Verificar que no esté activa
 	s.mu.RLock()
 	if _, ok := s.terminals[id]; ok {
 		s.mu.RUnlock()
@@ -735,7 +677,7 @@ func (s *TerminalService) Write(id string, data []byte) error {
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	_, err := terminal.Pty.Write(data)
+	_, err := terminal.Write(data)
 	return err
 }
 
@@ -749,22 +691,61 @@ func (s *TerminalService) Resize(id string, rows, cols uint16) error {
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	// Usar la interfaz PTY cross-platform para redimensionar
-	if err := terminal.Pty.Resize(cols, rows); err != nil {
-		return err
+	return terminal.Resize(cols, rows)
+}
+
+// Pause pausa una terminal Claude
+func (s *TerminalService) Pause(id string) error {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	// Actualizar también el estado de pantalla virtual
-	if terminal.Screen != nil {
-		terminal.Screen.Resize(int(cols), int(rows))
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
+		return fmt.Errorf("pause solo disponible para terminales claude: %s", id)
 	}
 
-	// Actualizar ClaudeScreen si existe
-	if terminal.ClaudeScreen != nil {
-		terminal.ClaudeScreen.Resize(int(cols), int(rows))
+	return tc.Pause()
+}
+
+// ResumeFromPause reanuda una terminal Claude pausada
+func (s *TerminalService) ResumeFromPause(id string) error {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	return nil
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
+		return fmt.Errorf("resume solo disponible para terminales claude: %s", id)
+	}
+
+	return tc.Resume()
+}
+
+// Archive archiva una terminal Claude
+func (s *TerminalService) Archive(id string) error {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
+		return fmt.Errorf("archive solo disponible para terminales claude: %s", id)
+	}
+
+	return tc.Archive()
 }
 
 // GetClaudeState retorna el estado de Claude para una terminal
@@ -777,12 +758,12 @@ func (s *TerminalService) GetClaudeState(id string) (*ClaudeStateInfo, error) {
 		return nil, fmt.Errorf("terminal no encontrada o no activa: %s", id)
 	}
 
-	if terminal.ClaudeScreen == nil {
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
 		return nil, fmt.Errorf("claude state no disponible (terminal no es de tipo claude): %s", id)
 	}
 
-	state := terminal.ClaudeScreen.GetClaudeState()
-	return &state, nil
+	return tc.GetClaudeState(), nil
 }
 
 // GetClaudeCheckpoints retorna los checkpoints de una terminal Claude
@@ -795,11 +776,12 @@ func (s *TerminalService) GetClaudeCheckpoints(id string) ([]Checkpoint, error) 
 		return nil, fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	if terminal.ClaudeScreen == nil {
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
 		return nil, fmt.Errorf("checkpoints no disponibles (terminal no es de tipo claude): %s", id)
 	}
 
-	return terminal.ClaudeScreen.GetCheckpoints(), nil
+	return tc.GetCheckpoints(), nil
 }
 
 // GetClaudeEvents retorna el historial de eventos de una terminal Claude
@@ -812,11 +794,12 @@ func (s *TerminalService) GetClaudeEvents(id string) ([]HookEvent, error) {
 		return nil, fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	if terminal.ClaudeScreen == nil {
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
 		return nil, fmt.Errorf("eventos no disponibles (terminal no es de tipo claude): %s", id)
 	}
 
-	return terminal.ClaudeScreen.GetEventHistory(), nil
+	return tc.GetEvents(), nil
 }
 
 // AddClaudeCheckpoint agrega un checkpoint manualmente
@@ -829,11 +812,12 @@ func (s *TerminalService) AddClaudeCheckpoint(id string, checkpointID string, to
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	if terminal.ClaudeScreen == nil {
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
 		return fmt.Errorf("terminal no es de tipo claude: %s", id)
 	}
 
-	terminal.ClaudeScreen.AddCheckpoint(checkpointID, tool, files)
+	tc.AddCheckpoint(checkpointID, tool, files)
 	return nil
 }
 
@@ -847,11 +831,12 @@ func (s *TerminalService) AddClaudeEvent(id string, eventType HookEventType, too
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	if terminal.ClaudeScreen == nil {
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
 		return fmt.Errorf("terminal no es de tipo claude: %s", id)
 	}
 
-	terminal.ClaudeScreen.AddEvent(eventType, tool, data)
+	tc.AddEvent(eventType, tool, data)
 	return nil
 }
 
@@ -865,35 +850,47 @@ func (s *TerminalService) GetSnapshot(id string) (*TerminalSnapshot, error) {
 		return nil, fmt.Errorf("terminal no encontrada o no activa: %s", id)
 	}
 
-	if terminal.Screen == nil {
-		return nil, fmt.Errorf("screen state no disponible para terminal: %s", id)
-	}
-
-	cursorX, cursorY := terminal.Screen.GetCursor()
-	width, height := terminal.Screen.GetSize()
-
-	return &TerminalSnapshot{
-		Content:           terminal.Screen.Snapshot(),
-		Display:           terminal.Screen.GetDisplay(),
-		CursorX:           cursorX,
-		CursorY:           cursorY,
-		Width:             width,
-		Height:            height,
-		InAlternateScreen: terminal.Screen.IsInAlternateScreen(),
-		History:           terminal.Screen.GetHistoryLines(),
-	}, nil
+	return terminal.GetSnapshot(), nil
 }
 
-// TerminalSnapshot representa el estado completo de una pantalla de terminal
-type TerminalSnapshot struct {
-	Content           string   `json:"content"`             // Texto plano de la pantalla
-	Display           []string `json:"display"`             // Líneas individuales
-	CursorX           int      `json:"cursor_x"`            // Posición X del cursor
-	CursorY           int      `json:"cursor_y"`            // Posición Y del cursor
-	Width             int      `json:"width"`               // Ancho de la pantalla
-	Height            int      `json:"height"`              // Alto de la pantalla
-	InAlternateScreen bool     `json:"in_alternate_screen"` // Si está en modo vim/htop
-	History           []string `json:"history,omitempty"`   // Historial de scroll
+// GetTerminalState retorna el estado de máquina de estados de una terminal Claude
+func (s *TerminalService) GetTerminalState(id string) (*ClaudeStateSnapshot, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
+		return nil, fmt.Errorf("state no disponible para terminales raw: %s", id)
+	}
+
+	return tc.GetClaudeStateSnapshot(), nil
+}
+
+// GetMessages retorna métricas de mensajes de una terminal Claude
+func (s *TerminalService) GetMessages(id string) (map[string]int, error) {
+	s.mu.RLock()
+	terminal, ok := s.terminals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("terminal no encontrada: %s", id)
+	}
+
+	tc, ok := terminal.(*TerminalClaude)
+	if !ok {
+		return nil, fmt.Errorf("messages no disponible para terminales raw: %s", id)
+	}
+
+	return map[string]int{
+		"message_count":      tc.GetMessageCount(),
+		"user_messages":      tc.GetUserMessages(),
+		"assistant_messages": tc.GetAssistantMessages(),
+	}, nil
 }
 
 // AddClient añade un cliente WebSocket
@@ -906,10 +903,7 @@ func (s *TerminalService) AddClient(id string, conn *websocket.Conn) error {
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	terminal.ClientsMu.Lock()
-	terminal.Clients[conn] = true
-	terminal.ClientsMu.Unlock()
-
+	terminal.AddClient(conn)
 	logger.Get().WebSocket("connected", id)
 	return nil
 }
@@ -924,10 +918,7 @@ func (s *TerminalService) RemoveClient(id string, conn *websocket.Conn) {
 		return
 	}
 
-	terminal.ClientsMu.Lock()
-	delete(terminal.Clients, conn)
-	terminal.ClientsMu.Unlock()
-
+	terminal.RemoveClient(conn)
 	logger.Get().WebSocket("disconnected", id)
 }
 
@@ -939,25 +930,28 @@ func (s *TerminalService) IsActive(id string) bool {
 	return ok
 }
 
-// toTerminalInfo convierte Terminal a TerminalInfo
-func (s *TerminalService) toTerminalInfo(t *Terminal, active bool) *TerminalInfo {
-	t.ClientsMu.RLock()
-	clients := len(t.Clients)
-	t.ClientsMu.RUnlock()
-
-	return &TerminalInfo{
-		ID:        t.ID,
-		Name:      t.Name,
-		WorkDir:   t.WorkDir,
-		SessionID: t.SessionID,
-		Type:      t.Type,
-		Status:    t.Status,
-		Model:     t.Config.Model,
+// toTerminalInfoNew convierte Terminal interface a TerminalInfo
+func (s *TerminalService) toTerminalInfoNew(t Terminal, active bool) *TerminalInfo {
+	info := &TerminalInfo{
+		ID:        t.GetID(),
+		Name:      t.GetName(),
+		WorkDir:   t.GetWorkDir(),
+		SessionID: t.GetSessionID(),
+		Type:      t.GetType(),
+		Status:    t.GetStatus(),
+		Model:     t.GetModel(),
 		Active:    active,
-		Clients:   clients,
-		CanResume: t.Type == "claude",
-		StartedAt: t.StartedAt,
+		Clients:   t.GetClientCount(),
+		CanResume: t.GetType() == "claude",
+		StartedAt: t.GetStartedAt(),
 	}
+
+	// Añadir estado Claude si aplica
+	if tc, ok := t.(*TerminalClaude); ok {
+		info.ClaudeState = tc.GetClaudeStateSnapshot()
+	}
+
+	return info
 }
 
 // ListDirectory lista contenido de un directorio
@@ -967,7 +961,6 @@ func ListDirectory(path string, allowedPrefixes []string) ([]DirectoryEntry, err
 	}
 	path = filepath.Clean(path)
 
-	// Validar path
 	if err := ValidatePath(path, allowedPrefixes); err != nil {
 		return nil, err
 	}
@@ -1029,7 +1022,7 @@ func (s *TerminalService) GetSavedConfig(id string) (*TerminalConfig, error) {
 	return &saved.Config, nil
 }
 
-// MarkAsImported marca una terminal como importada (para sincronizar con Claude sessions)
+// MarkAsImported marca una terminal como importada
 func (s *TerminalService) MarkAsImported(sessionID, name, workDir string) {
 	s.savedMu.Lock()
 	if _, exists := s.saved[sessionID]; !exists {
@@ -1062,13 +1055,12 @@ func (s *TerminalService) RemoveFromSaved(id string) {
 	s.persistSaved()
 }
 
-// ShutdownAll termina todas las terminales activas ordenadamente
-// Usa WaitGroup para esperar terminación en lugar de time.Sleep
+// ShutdownAll termina todas las terminales activas
 func (s *TerminalService) ShutdownAll() {
 	s.ShutdownAllWithTimeout(5 * time.Second)
 }
 
-// ShutdownAllWithTimeout termina todas las terminales con timeout configurable
+// ShutdownAllWithTimeout termina todas las terminales con timeout
 func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 	s.mu.RLock()
 	ids := make([]string, 0, len(s.terminals))
@@ -1084,7 +1076,6 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 
 	logger.Info("Terminando terminales activas", "count", len(ids))
 
-	// Canal para señalar terminación
 	done := make(chan string, len(ids))
 	signaler := NewProcessSignaler()
 
@@ -1099,33 +1090,38 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 		}
 
 		// Notificar a clientes
-		terminal.ClientsMu.RLock()
-		for client := range terminal.Clients {
+		var clients map[*websocket.Conn]bool
+		switch t := terminal.(type) {
+		case *TerminalRaw:
+			clients = t.GetClients()
+		case *TerminalClaude:
+			clients = t.GetClients()
+		}
+
+		for client := range clients {
 			client.WriteJSON(map[string]string{
 				"type":    "shutdown",
 				"message": "Servidor terminando",
 			})
 		}
-		terminal.ClientsMu.RUnlock()
 
-		// Enviar señal de terminación al proceso (cross-platform)
-		if terminal.Cmd != nil && terminal.Cmd.Process != nil {
+		// Terminar proceso
+		cmd := terminal.GetCmd()
+		if execCmd, ok := cmd.(*exec.Cmd); ok && execCmd != nil && execCmd.Process != nil {
 			logger.Get().Terminal("shutdown", id)
-			signaler.Terminate(terminal.Cmd)
+			signaler.Terminate(execCmd)
 
-			// Goroutine para esperar terminación de este proceso
-			go func(t *Terminal, termID string) {
-				if t.Cmd != nil && t.Cmd.Process != nil {
-					t.Cmd.Wait()
+			go func(c *exec.Cmd, termID string) {
+				if c != nil && c.Process != nil {
+					c.Wait()
 				}
 				done <- termID
-			}(terminal, id)
+			}(execCmd, id)
 		} else {
 			done <- id
 		}
 	}
 
-	// Esperar terminación con timeout
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
@@ -1136,7 +1132,6 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 			terminated++
 			logger.Debug("Terminal terminada", "id", termID, "terminated", terminated, "total", len(ids))
 		case <-timer.C:
-			// Timeout - forzar terminación de restantes
 			s.mu.RLock()
 			remaining := len(s.terminals)
 			s.mu.RUnlock()
@@ -1145,7 +1140,11 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 				logger.Warn("Timeout esperando terminación, forzando kill", "remaining", remaining)
 				s.mu.RLock()
 				for _, terminal := range s.terminals {
-					signaler.Kill(terminal.Cmd)
+					if cmd := terminal.GetCmd(); cmd != nil {
+						if execCmd, ok := cmd.(*exec.Cmd); ok {
+							signaler.Kill(execCmd)
+						}
+					}
 				}
 				s.mu.RUnlock()
 			}

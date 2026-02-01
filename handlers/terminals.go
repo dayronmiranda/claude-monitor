@@ -491,3 +491,160 @@ func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) 
 
 	json.NewEncoder(w).Encode(SuccessWithMeta(events, &APIMeta{Total: len(events)}))
 }
+
+// Pause godoc
+// @Summary      Pausar terminal Claude
+// @Description  Pausa una terminal Claude activa (solo terminales tipo claude)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/pause [post]
+// @Security     BasicAuth
+func (h *TerminalsHandler) Pause(w http.ResponseWriter, r *http.Request) {
+	id := URLParam(r, "terminalID")
+	if id == "" {
+		WriteBadRequest(w, "terminal id requerido")
+		return
+	}
+
+	if err := h.terminals.Pause(id); err != nil {
+		if strings.Contains(err.Error(), "no encontrada") {
+			WriteNotFound(w, "terminal")
+		} else {
+			WriteBadRequest(w, err.Error())
+		}
+		return
+	}
+
+	WriteSuccess(w, map[string]string{"message": "Terminal pausada"})
+}
+
+// ResumeFromPause godoc
+// @Summary      Reanudar terminal Claude pausada
+// @Description  Reanuda una terminal Claude que está pausada (diferente de Resume que recrea la terminal)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/unpause [post]
+// @Security     BasicAuth
+func (h *TerminalsHandler) ResumeFromPause(w http.ResponseWriter, r *http.Request) {
+	id := URLParam(r, "terminalID")
+	if id == "" {
+		WriteBadRequest(w, "terminal id requerido")
+		return
+	}
+
+	if err := h.terminals.ResumeFromPause(id); err != nil {
+		if strings.Contains(err.Error(), "no encontrada") {
+			WriteNotFound(w, "terminal")
+		} else {
+			WriteBadRequest(w, err.Error())
+		}
+		return
+	}
+
+	WriteSuccess(w, map[string]string{"message": "Terminal reanudada"})
+}
+
+// Archive godoc
+// @Summary      Archivar terminal Claude
+// @Description  Archiva una terminal Claude detenida o pausada (solo terminales tipo claude)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/archive [post]
+// @Security     BasicAuth
+func (h *TerminalsHandler) Archive(w http.ResponseWriter, r *http.Request) {
+	id := URLParam(r, "terminalID")
+	if id == "" {
+		WriteBadRequest(w, "terminal id requerido")
+		return
+	}
+
+	if err := h.terminals.Archive(id); err != nil {
+		if strings.Contains(err.Error(), "no encontrada") {
+			WriteNotFound(w, "terminal")
+		} else {
+			WriteBadRequest(w, err.Error())
+		}
+		return
+	}
+
+	WriteSuccess(w, map[string]string{"message": "Terminal archivada"})
+}
+
+// State godoc
+// @Summary      Obtener estado de máquina de estados
+// @Description  Retorna el estado de la máquina de estados de una terminal Claude (created, active, paused, stopped, archived, error)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse{data=services.ClaudeStateSnapshot}
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/state [get]
+// @Security     BasicAuth
+func (h *TerminalsHandler) State(w http.ResponseWriter, r *http.Request) {
+	id := URLParam(r, "terminalID")
+	if id == "" {
+		WriteBadRequest(w, "terminal id requerido")
+		return
+	}
+
+	state, err := h.terminals.GetTerminalState(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no encontrada") {
+			WriteNotFound(w, "terminal")
+		} else {
+			WriteBadRequest(w, err.Error())
+		}
+		return
+	}
+
+	WriteSuccess(w, state)
+}
+
+// Messages godoc
+// @Summary      Obtener métricas de mensajes
+// @Description  Retorna contadores de mensajes de una terminal Claude (message_count, user_messages, assistant_messages)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/messages [get]
+// @Security     BasicAuth
+func (h *TerminalsHandler) Messages(w http.ResponseWriter, r *http.Request) {
+	id := URLParam(r, "terminalID")
+	if id == "" {
+		WriteBadRequest(w, "terminal id requerido")
+		return
+	}
+
+	messages, err := h.terminals.GetMessages(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no encontrada") {
+			WriteNotFound(w, "terminal")
+		} else {
+			WriteBadRequest(w, err.Error())
+		}
+		return
+	}
+
+	WriteSuccess(w, messages)
+}

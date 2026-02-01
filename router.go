@@ -19,7 +19,6 @@ type Router struct {
 	sessionRoots *handlers.SessionRootsHandler
 	sessions     *handlers.SessionsHandler
 	terminals    *handlers.TerminalsHandler
-	jobs         *handlers.JobsHandler
 	analytics    *handlers.AnalyticsHandler
 }
 
@@ -27,7 +26,6 @@ type Router struct {
 func NewRouter(
 	claude *services.ClaudeService,
 	terminals *services.TerminalService,
-	jobs *services.JobService,
 	analytics *services.AnalyticsService,
 	hostName, version, claudeDir string,
 	allowedPathPrefixes []string,
@@ -38,7 +36,6 @@ func NewRouter(
 		sessionRoots: handlers.NewSessionRootsHandler(claude, analytics),
 		sessions:     handlers.NewSessionsHandler(claude, terminals, analytics),
 		terminals:    handlers.NewTerminalsHandler(terminals, allowedPathPrefixes),
-		jobs:         handlers.NewJobsHandler(jobs),
 		analytics:    handlers.NewAnalyticsHandler(analytics),
 	}
 }
@@ -96,32 +93,6 @@ func (r *Router) SetupRoutes() {
 						session.Get("/messages/realtime", r.sessions.GetRealTimeMessages)
 					})
 				})
-
-				// Jobs dentro del session-root
-				root.Route("/jobs", func(jobsRouter chi.Router) {
-					jobsRouter.Get("/", r.jobs.ListJobs)
-					jobsRouter.Post("/", r.jobs.CreateJob)
-
-					jobsRouter.Route("/{jobID}", func(job chi.Router) {
-						job.Get("/", r.jobs.GetJob)
-						job.Delete("/", r.jobs.DeleteJob)
-
-						// Transiciones de estado
-						job.Post("/start", r.jobs.StartJob)
-						job.Post("/pause", r.jobs.PauseJob)
-						job.Post("/resume", r.jobs.ResumeJob)
-						job.Post("/stop", r.jobs.StopJob)
-						job.Post("/archive", r.jobs.ArchiveJob)
-
-						// Error handling
-						job.Post("/retry", r.jobs.RetryJob)
-						job.Post("/discard", r.jobs.DiscardJob)
-
-						// Info
-						job.Get("/messages", r.jobs.GetJobMessages)
-						job.Get("/actions", r.jobs.GetJobActions)
-					})
-				})
 			})
 		})
 
@@ -137,13 +108,22 @@ func (r *Router) SetupRoutes() {
 				// WebSocket (sin middleware JSON)
 				term.Get("/ws", r.terminals.WebSocket)
 
-				// Operaciones
+				// Operaciones comunes
 				term.Post("/kill", r.terminals.Kill)
 				term.Post("/resume", r.terminals.Resume)
 				term.Post("/resize", r.terminals.Resize)
 
-				// Info
+				// Info comunes
 				term.Get("/snapshot", r.terminals.Snapshot)
+
+				// Operaciones solo para TerminalClaude
+				term.Post("/pause", r.terminals.Pause)
+				term.Post("/unpause", r.terminals.ResumeFromPause)
+				term.Post("/archive", r.terminals.Archive)
+
+				// Info solo para TerminalClaude
+				term.Get("/state", r.terminals.State)
+				term.Get("/messages", r.terminals.Messages)
 				term.Get("/claude-state", r.terminals.ClaudeState)
 				term.Get("/checkpoints", r.terminals.ClaudeCheckpoints)
 				term.Get("/events", r.terminals.ClaudeEvents)

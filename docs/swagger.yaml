@@ -142,6 +142,29 @@ definitions:
       user_messages:
         type: integer
     type: object
+  services.ClaudeStateSnapshot:
+    properties:
+      archived_at:
+        type: string
+      assistant_messages:
+        type: integer
+      error:
+        $ref: '#/definitions/services.TerminalError'
+      message_count:
+        type: integer
+      pause_count:
+        type: integer
+      paused_at:
+        type: string
+      resume_count:
+        type: integer
+      state:
+        $ref: '#/definitions/services.TerminalState'
+      stopped_at:
+        type: string
+      user_messages:
+        type: integer
+    type: object
   services.DailyActivity:
     properties:
       date:
@@ -182,120 +205,6 @@ definitions:
       total_user_messages:
         type: integer
     type: object
-  services.Job:
-    properties:
-      archived_at:
-        description: Archivado
-        type: string
-      assistant_messages:
-        type: integer
-      auto_archived:
-        type: boolean
-      clients:
-        description: WebSocket clients
-        type: integer
-      created_at:
-        description: Creación
-        type: string
-      description:
-        description: Descripción opcional
-        type: string
-      error:
-        allOf:
-        - $ref: '#/definitions/services.JobError'
-        description: Error handling
-      id:
-        description: Identidad
-        type: string
-      is_archived:
-        description: Flags
-        type: boolean
-      memory_mb:
-        description: Uso memoria
-        type: integer
-      message_count:
-        description: Métricas de conversación
-        type: integer
-      model:
-        description: Modelo Claude
-        type: string
-      name:
-        description: Configuración
-        type: string
-      pause_count:
-        description: Contadores de ciclo de vida
-        type: integer
-      paused_at:
-        description: Última pausa
-        type: string
-      process_id:
-        description: PID
-        type: integer
-      project_path:
-        description: Proyecto padre
-        type: string
-      pty_id:
-        description: Recursos (si activo)
-        type: string
-      real_path:
-        description: Path decodificado
-        type: string
-      resume_count:
-        description: Cuántas reanudaciones
-        type: integer
-      session_id:
-        description: Mismo que ID (compat)
-        type: string
-      started_at:
-        description: Primera ejecución
-        type: string
-      state:
-        allOf:
-        - $ref: '#/definitions/services.JobState'
-        description: Estado
-      stopped_at:
-        description: Última parada
-        type: string
-      type:
-        description: '"claude" o "terminal"'
-        type: string
-      user_messages:
-        type: integer
-      work_dir:
-        description: Directorio de ejecución
-        type: string
-    type: object
-  services.JobError:
-    properties:
-      code:
-        type: string
-      message:
-        type: string
-      retry_count:
-        type: integer
-      timestamp:
-        type: string
-    type: object
-  services.JobState:
-    enum:
-    - created
-    - starting
-    - active
-    - paused
-    - stopped
-    - archived
-    - error
-    - deleted
-    type: string
-    x-enum-varnames:
-    - JobStateCreated
-    - JobStateStarting
-    - JobStateActive
-    - JobStatePaused
-    - JobStateStopped
-    - JobStateArchived
-    - JobStateError
-    - JobStateDeleted
   services.ProjectAnalytics:
     properties:
       cached_until:
@@ -386,12 +295,27 @@ definitions:
       work_dir:
         type: string
     type: object
+  services.TerminalError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      retry_count:
+        type: integer
+      timestamp:
+        type: string
+    type: object
   services.TerminalInfo:
     properties:
       active:
         type: boolean
       can_resume:
         type: boolean
+      claude_state:
+        allOf:
+        - $ref: '#/definitions/services.ClaudeStateSnapshot'
+        description: Solo para tipo claude
       clients:
         type: integer
       created_at:
@@ -415,6 +339,24 @@ definitions:
       work_dir:
         type: string
     type: object
+  services.TerminalState:
+    enum:
+    - created
+    - starting
+    - active
+    - paused
+    - stopped
+    - archived
+    - error
+    type: string
+    x-enum-varnames:
+    - TerminalStateCreated
+    - TerminalStateStarting
+    - TerminalStateActive
+    - TerminalStatePaused
+    - TerminalStateStopped
+    - TerminalStateArchived
+    - TerminalStateError
 externalDocs:
   description: OpenAPI
   url: https://swagger.io/resources/open-api/
@@ -753,582 +695,6 @@ paths:
       summary: Obtener actividad de session-root
       tags:
       - session-roots
-  /session-roots/{rootPath}/jobs:
-    get:
-      consumes:
-      - application/json
-      description: Retorna todos los jobs de un session-root, opcionalmente filtrados
-        por estado
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: Filtrar por estado (created, starting, active, paused, stopped,
-          archived, error)
-        in: query
-        name: state
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/services.Job'
-                  type: array
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Listar jobs
-      tags:
-      - jobs
-    post:
-      consumes:
-      - application/json
-      description: Crea un nuevo job (trabajo de Claude o terminal)
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: Configuración del job
-        in: body
-        name: request
-        required: true
-        schema:
-          properties:
-            description:
-              type: string
-            id:
-              type: string
-            model:
-              type: string
-            name:
-              type: string
-            type:
-              type: string
-            work_dir:
-              type: string
-          type: object
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Crear job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}:
-    delete:
-      consumes:
-      - application/json
-      description: Elimina un job permanentemente
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Eliminar job
-      tags:
-      - jobs
-    get:
-      consumes:
-      - application/json
-      description: Retorna información detallada de un job
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Obtener job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/actions:
-    get:
-      consumes:
-      - application/json
-      description: Retorna las acciones/transiciones válidas para el estado actual
-        del job
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Obtener acciones de job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/archive:
-    post:
-      consumes:
-      - application/json
-      description: Archiva un job detenido para ocultarlo de la lista principal
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Archivar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/discard:
-    post:
-      consumes:
-      - application/json
-      description: Descarta un job en estado de error (lo elimina)
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Descartar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/messages:
-    get:
-      consumes:
-      - application/json
-      description: Retorna los mensajes de conversación de un job
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Obtener mensajes de job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/pause:
-    post:
-      consumes:
-      - application/json
-      description: Pausa la ejecución de un job activo
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Pausar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/resume:
-    post:
-      consumes:
-      - application/json
-      description: Reanuda la ejecución de un job pausado
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Reanudar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/retry:
-    post:
-      consumes:
-      - application/json
-      description: Reintenta la ejecución de un job en estado de error
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Reintentar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/start:
-    post:
-      consumes:
-      - application/json
-      description: Inicia la ejecución de un job
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Iniciar job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/{jobID}/stop:
-    post:
-      consumes:
-      - application/json
-      description: Detiene la ejecución de un job activo o pausado
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: ID del job
-        in: path
-        name: jobID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handlers.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/services.Job'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Detener job
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/batch/action:
-    post:
-      consumes:
-      - application/json
-      description: Ejecuta una acción (start, pause, resume, stop, archive, delete)
-        en múltiples jobs
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: IDs y acción a ejecutar
-        in: body
-        name: request
-        required: true
-        schema:
-          properties:
-            action:
-              type: string
-            ids:
-              items:
-                type: string
-              type: array
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Ejecutar acción en lote
-      tags:
-      - jobs
-  /session-roots/{rootPath}/jobs/batch/delete:
-    post:
-      consumes:
-      - application/json
-      description: Elimina múltiples jobs a la vez
-      parameters:
-      - description: Path del session-root (URL encoded)
-        in: path
-        name: rootPath
-        required: true
-        type: string
-      - description: IDs de jobs a eliminar
-        in: body
-        name: request
-        required: true
-        schema:
-          properties:
-            ids:
-              items:
-                type: string
-              type: array
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.APIResponse'
-      security:
-      - BasicAuth: []
-      summary: Eliminar jobs en lote
-      tags:
-      - jobs
   /session-roots/{rootPath}/sessions:
     get:
       consumes:
@@ -1798,6 +1164,38 @@ paths:
       summary: Obtener terminal
       tags:
       - terminals
+  /terminals/{terminalID}/archive:
+    post:
+      consumes:
+      - application/json
+      description: Archiva una terminal Claude detenida o pausada (solo terminales
+        tipo claude)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Archivar terminal Claude
+      tags:
+      - terminals
   /terminals/{terminalID}/checkpoints:
     get:
       consumes:
@@ -1926,6 +1324,69 @@ paths:
       summary: Matar terminal
       tags:
       - terminals
+  /terminals/{terminalID}/messages:
+    get:
+      consumes:
+      - application/json
+      description: Retorna contadores de mensajes de una terminal Claude (message_count,
+        user_messages, assistant_messages)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener métricas de mensajes
+      tags:
+      - terminals
+  /terminals/{terminalID}/pause:
+    post:
+      consumes:
+      - application/json
+      description: Pausa una terminal Claude activa (solo terminales tipo claude)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Pausar terminal Claude
+      tags:
+      - terminals
   /terminals/{terminalID}/resize:
     post:
       consumes:
@@ -2033,6 +1494,75 @@ paths:
       security:
       - BasicAuth: []
       summary: Obtener snapshot de terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/state:
+    get:
+      consumes:
+      - application/json
+      description: Retorna el estado de la máquina de estados de una terminal Claude
+        (created, active, paused, stopped, archived, error)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.ClaudeStateSnapshot'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener estado de máquina de estados
+      tags:
+      - terminals
+  /terminals/{terminalID}/unpause:
+    post:
+      consumes:
+      - application/json
+      description: Reanuda una terminal Claude que está pausada (diferente de Resume
+        que recrea la terminal)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Reanudar terminal Claude pausada
       tags:
       - terminals
   /terminals/{terminalID}/ws:

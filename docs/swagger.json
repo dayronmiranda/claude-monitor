@@ -534,937 +534,6 @@
                 }
             }
         },
-        "/session-roots/{rootPath}/jobs": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Retorna todos los jobs de un session-root, opcionalmente filtrados por estado",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Listar jobs",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filtrar por estado (created, starting, active, paused, stopped, archived, error)",
-                        "name": "state",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/services.Job"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Crea un nuevo job (trabajo de Claude o terminal)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Crear job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Configuración del job",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "description": {
-                                    "type": "string"
-                                },
-                                "id": {
-                                    "type": "string"
-                                },
-                                "model": {
-                                    "type": "string"
-                                },
-                                "name": {
-                                    "type": "string"
-                                },
-                                "type": {
-                                    "type": "string"
-                                },
-                                "work_dir": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/batch/action": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Ejecuta una acción (start, pause, resume, stop, archive, delete) en múltiples jobs",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Ejecutar acción en lote",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "IDs y acción a ejecutar",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "action": {
-                                    "type": "string"
-                                },
-                                "ids": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/batch/delete": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Elimina múltiples jobs a la vez",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Eliminar jobs en lote",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "IDs de jobs a eliminar",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "ids": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Retorna información detallada de un job",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Obtener job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Elimina un job permanentemente",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Eliminar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/actions": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Retorna las acciones/transiciones válidas para el estado actual del job",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Obtener acciones de job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/archive": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Archiva un job detenido para ocultarlo de la lista principal",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Archivar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/discard": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Descarta un job en estado de error (lo elimina)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Descartar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/messages": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Retorna los mensajes de conversación de un job",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Obtener mensajes de job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/pause": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Pausa la ejecución de un job activo",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Pausar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/resume": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Reanuda la ejecución de un job pausado",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Reanudar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/retry": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Reintenta la ejecución de un job en estado de error",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Reintentar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/start": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Inicia la ejecución de un job",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Iniciar job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/session-roots/{rootPath}/jobs/{jobID}/stop": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Detiene la ejecución de un job activo o pausado",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "jobs"
-                ],
-                "summary": "Detener job",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path del session-root (URL encoded)",
-                        "name": "rootPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ID del job",
-                        "name": "jobID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handlers.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/services.Job"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/session-roots/{rootPath}/sessions": {
             "get": {
                 "security": [
@@ -2216,6 +1285,55 @@
                 }
             }
         },
+        "/terminals/{terminalID}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Archiva una terminal Claude detenida o pausada (solo terminales tipo claude)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "terminals"
+                ],
+                "summary": "Archivar terminal Claude",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la terminal",
+                        "name": "terminalID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/terminals/{terminalID}/checkpoints": {
             "get": {
                 "security": [
@@ -2414,6 +1532,104 @@
                 }
             }
         },
+        "/terminals/{terminalID}/messages": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Retorna contadores de mensajes de una terminal Claude (message_count, user_messages, assistant_messages)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "terminals"
+                ],
+                "summary": "Obtener métricas de mensajes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la terminal",
+                        "name": "terminalID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/terminals/{terminalID}/pause": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Pausa una terminal Claude activa (solo terminales tipo claude)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "terminals"
+                ],
+                "summary": "Pausar terminal Claude",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la terminal",
+                        "name": "terminalID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/terminals/{terminalID}/resize": {
             "post": {
                 "security": [
@@ -2559,6 +1775,116 @@
                     "terminals"
                 ],
                 "summary": "Obtener snapshot de terminal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la terminal",
+                        "name": "terminalID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/terminals/{terminalID}/state": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Retorna el estado de la máquina de estados de una terminal Claude (created, active, paused, stopped, archived, error)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "terminals"
+                ],
+                "summary": "Obtener estado de máquina de estados",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la terminal",
+                        "name": "terminalID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handlers.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/services.ClaudeStateSnapshot"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/terminals/{terminalID}/unpause": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Reanuda una terminal Claude que está pausada (diferente de Resume que recrea la terminal)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "terminals"
+                ],
+                "summary": "Reanudar terminal Claude pausada",
                 "parameters": [
                     {
                         "type": "string",
@@ -2847,6 +2173,41 @@
                 }
             }
         },
+        "services.ClaudeStateSnapshot": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "assistant_messages": {
+                    "type": "integer"
+                },
+                "error": {
+                    "$ref": "#/definitions/services.TerminalError"
+                },
+                "message_count": {
+                    "type": "integer"
+                },
+                "pause_count": {
+                    "type": "integer"
+                },
+                "paused_at": {
+                    "type": "string"
+                },
+                "resume_count": {
+                    "type": "integer"
+                },
+                "state": {
+                    "$ref": "#/definitions/services.TerminalState"
+                },
+                "stopped_at": {
+                    "type": "string"
+                },
+                "user_messages": {
+                    "type": "integer"
+                }
+            }
+        },
         "services.DailyActivity": {
             "type": "object",
             "properties": {
@@ -2907,164 +2268,6 @@
                     "type": "integer"
                 }
             }
-        },
-        "services.Job": {
-            "type": "object",
-            "properties": {
-                "archived_at": {
-                    "description": "Archivado",
-                    "type": "string"
-                },
-                "assistant_messages": {
-                    "type": "integer"
-                },
-                "auto_archived": {
-                    "type": "boolean"
-                },
-                "clients": {
-                    "description": "WebSocket clients",
-                    "type": "integer"
-                },
-                "created_at": {
-                    "description": "Creación",
-                    "type": "string"
-                },
-                "description": {
-                    "description": "Descripción opcional",
-                    "type": "string"
-                },
-                "error": {
-                    "description": "Error handling",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/services.JobError"
-                        }
-                    ]
-                },
-                "id": {
-                    "description": "Identidad",
-                    "type": "string"
-                },
-                "is_archived": {
-                    "description": "Flags",
-                    "type": "boolean"
-                },
-                "memory_mb": {
-                    "description": "Uso memoria",
-                    "type": "integer"
-                },
-                "message_count": {
-                    "description": "Métricas de conversación",
-                    "type": "integer"
-                },
-                "model": {
-                    "description": "Modelo Claude",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Configuración",
-                    "type": "string"
-                },
-                "pause_count": {
-                    "description": "Contadores de ciclo de vida",
-                    "type": "integer"
-                },
-                "paused_at": {
-                    "description": "Última pausa",
-                    "type": "string"
-                },
-                "process_id": {
-                    "description": "PID",
-                    "type": "integer"
-                },
-                "project_path": {
-                    "description": "Proyecto padre",
-                    "type": "string"
-                },
-                "pty_id": {
-                    "description": "Recursos (si activo)",
-                    "type": "string"
-                },
-                "real_path": {
-                    "description": "Path decodificado",
-                    "type": "string"
-                },
-                "resume_count": {
-                    "description": "Cuántas reanudaciones",
-                    "type": "integer"
-                },
-                "session_id": {
-                    "description": "Mismo que ID (compat)",
-                    "type": "string"
-                },
-                "started_at": {
-                    "description": "Primera ejecución",
-                    "type": "string"
-                },
-                "state": {
-                    "description": "Estado",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/services.JobState"
-                        }
-                    ]
-                },
-                "stopped_at": {
-                    "description": "Última parada",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "\"claude\" o \"terminal\"",
-                    "type": "string"
-                },
-                "user_messages": {
-                    "type": "integer"
-                },
-                "work_dir": {
-                    "description": "Directorio de ejecución",
-                    "type": "string"
-                }
-            }
-        },
-        "services.JobError": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "retry_count": {
-                    "type": "integer"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.JobState": {
-            "type": "string",
-            "enum": [
-                "created",
-                "starting",
-                "active",
-                "paused",
-                "stopped",
-                "archived",
-                "error",
-                "deleted"
-            ],
-            "x-enum-varnames": [
-                "JobStateCreated",
-                "JobStateStarting",
-                "JobStateActive",
-                "JobStatePaused",
-                "JobStateStopped",
-                "JobStateArchived",
-                "JobStateError",
-                "JobStateDeleted"
-            ]
         },
         "services.ProjectAnalytics": {
             "type": "object",
@@ -3202,6 +2405,23 @@
                 }
             }
         },
+        "services.TerminalError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "retry_count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "services.TerminalInfo": {
             "type": "object",
             "properties": {
@@ -3210,6 +2430,14 @@
                 },
                 "can_resume": {
                     "type": "boolean"
+                },
+                "claude_state": {
+                    "description": "Solo para tipo claude",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/services.ClaudeStateSnapshot"
+                        }
+                    ]
                 },
                 "clients": {
                     "type": "integer"
@@ -3245,6 +2473,27 @@
                     "type": "string"
                 }
             }
+        },
+        "services.TerminalState": {
+            "type": "string",
+            "enum": [
+                "created",
+                "starting",
+                "active",
+                "paused",
+                "stopped",
+                "archived",
+                "error"
+            ],
+            "x-enum-varnames": [
+                "TerminalStateCreated",
+                "TerminalStateStarting",
+                "TerminalStateActive",
+                "TerminalStatePaused",
+                "TerminalStateStopped",
+                "TerminalStateArchived",
+                "TerminalStateError"
+            ]
         }
     },
     "securityDefinitions": {
