@@ -778,3 +778,103 @@ func (s *ClaudeService) GetSessionMessages(projectPath, sessionID string) ([]Ses
 
 	return messages, nil
 }
+
+// MoveSessionResult resultado de mover una sesión
+type MoveSessionResult struct {
+	SessionID      string `json:"session_id"`
+	OldProjectPath string `json:"old_project_path"`
+	NewProjectPath string `json:"new_project_path"`
+	OldRealPath    string `json:"old_real_path"`
+	NewRealPath    string `json:"new_real_path"`
+	PathsReplaced  int    `json:"paths_replaced"`
+}
+
+// MoveSession mueve una sesión de un proyecto a otro, actualizando todas las rutas internas
+func (s *ClaudeService) MoveSession(oldProjectPath, sessionID, newRealPath string) (*MoveSessionResult, error) {
+	// Validar que newRealPath sea absoluto
+	if !filepath.IsAbs(newRealPath) {
+		return nil, os.ErrInvalid
+	}
+
+	// Obtener la sesión actual
+	session, err := s.GetSession(oldProjectPath, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	oldRealPath := session.RealPath
+	oldFilePath := session.FilePath
+
+	// Calcular nuevo project path (encoded)
+	newProjectPath := EncodeProjectPath(newRealPath)
+
+	// Si el path destino es igual al origen, no hacer nada
+	if oldProjectPath == newProjectPath {
+		return nil, os.ErrExist
+	}
+
+	// Crear directorio destino si no existe
+	newProjectDir := filepath.Join(s.claudeDir, newProjectPath)
+	if err := os.MkdirAll(newProjectDir, 0755); err != nil {
+		return nil, err
+	}
+
+	// Leer contenido del archivo JSONL
+	content, err := os.ReadFile(oldFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reemplazar todas las ocurrencias del path viejo por el nuevo
+	oldContent := string(content)
+	newContent := strings.ReplaceAll(oldContent, oldRealPath, newRealPath)
+
+	// Contar reemplazos
+	pathsReplaced := strings.Count(oldContent, oldRealPath)
+
+	// Escribir archivo en nueva ubicación
+	newFilePath := filepath.Join(newProjectDir, sessionID+".jsonl")
+	if err := os.WriteFile(newFilePath, []byte(newContent), 0600); err != nil {
+		return nil, err
+	}
+
+	// Mover directorio de subagentes si existe
+	oldSubagentsDir := filepath.Join(s.claudeDir, oldProjectPath, sessionID)
+	newSubagentsDir := filepath.Join(newProjectDir, sessionID)
+
+	if info, err := os.Stat(oldSubagentsDir); err == nil && info.IsDir() {
+		// Crear directorio destino para subagentes
+		if err := os.MkdirAll(newSubagentsDir, 0755); err != nil {
+			// Rollback: eliminar archivo movido
+			os.Remove(newFilePath)
+			return nil, err
+		}
+
+		// Mover contenido de subagentes
+		entries, _ := os.ReadDir(oldSubagentsDir)
+		for _, entry := range entries {
+			oldPath := filepath.Join(oldSubagentsDir, entry.Name())
+			newPath := filepath.Join(newSubagentsDir, entry.Name())
+			if err := os.Rename(oldPath, newPath); err != nil {
+				log.Printf("[MoveSession] Error moviendo subagente %s: %v", entry.Name(), err)
+			}
+		}
+
+		// Eliminar directorio viejo de subagentes
+		os.RemoveAll(oldSubagentsDir)
+	}
+
+	// Eliminar archivo original
+	if err := os.Remove(oldFilePath); err != nil {
+		log.Printf("[MoveSession] Warning: no se pudo eliminar archivo original: %v", err)
+	}
+
+	return &MoveSessionResult{
+		SessionID:      sessionID,
+		OldProjectPath: oldProjectPath,
+		NewProjectPath: newProjectPath,
+		OldRealPath:    oldRealPath,
+		NewRealPath:    newRealPath,
+		PathsReplaced:  pathsReplaced,
+	}, nil
+}

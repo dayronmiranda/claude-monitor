@@ -1006,6 +1006,100 @@ const docTemplate = `{
                 }
             }
         },
+        "/session-roots/{rootPath}/sessions/{sessionID}/move": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Mueve una sesión a otro directorio, actualizando todas las rutas internas del JSONL",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Mover sesión a otro directorio",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Path del session-root actual (URL encoded)",
+                        "name": "rootPath",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la sesión",
+                        "name": "sessionID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Nueva ruta absoluta del proyecto",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "new_path": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handlers.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/services.MoveSessionResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/session-roots/{rootPath}/sessions/{sessionID}/rename": {
             "put": {
                 "security": [
@@ -2272,6 +2366,29 @@ const docTemplate = `{
                 },
                 "total_user_messages": {
                     "type": "integer"
+                }
+            }
+        },
+        "services.MoveSessionResult": {
+            "type": "object",
+            "properties": {
+                "new_project_path": {
+                    "type": "string"
+                },
+                "new_real_path": {
+                    "type": "string"
+                },
+                "old_project_path": {
+                    "type": "string"
+                },
+                "old_real_path": {
+                    "type": "string"
+                },
+                "paths_replaced": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
                 }
             }
         },

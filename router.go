@@ -89,6 +89,7 @@ func (r *Router) SetupRoutes() {
 						session.Get("/", r.sessions.Get)
 						session.Delete("/", r.sessions.Delete)
 						session.Put("/rename", r.sessions.Rename)
+						session.Post("/move", r.sessions.Move)
 						session.Get("/messages", r.sessions.GetMessages)
 						session.Get("/messages/realtime", r.sessions.GetRealTimeMessages)
 					})

@@ -205,6 +205,21 @@ definitions:
       total_user_messages:
         type: integer
     type: object
+  services.MoveSessionResult:
+    properties:
+      new_project_path:
+        type: string
+      new_real_path:
+        type: string
+      old_project_path:
+        type: string
+      old_real_path:
+        type: string
+      paths_replaced:
+        type: integer
+      session_id:
+        type: string
+    type: object
   services.ProjectAnalytics:
     properties:
       cached_until:
@@ -878,6 +893,65 @@ paths:
       security:
       - BasicAuth: []
       summary: Obtener mensajes en tiempo real
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/{sessionID}/move:
+    post:
+      consumes:
+      - application/json
+      description: Mueve una sesión a otro directorio, actualizando todas las rutas
+        internas del JSONL
+      parameters:
+      - description: Path del session-root actual (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      - description: Nueva ruta absoluta del proyecto
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            new_path:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.MoveSessionResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Mover sesión a otro directorio
       tags:
       - sessions
   /session-roots/{rootPath}/sessions/{sessionID}/rename:

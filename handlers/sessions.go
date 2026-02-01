@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 
 	"claude-monitor/services"
@@ -365,4 +366,67 @@ func (h *SessionsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 
 	session.Name = req.Name
 	WriteSuccess(w, session)
+}
+
+// Move godoc
+// @Summary      Mover sesión a otro directorio
+// @Description  Mueve una sesión a otro directorio, actualizando todas las rutas internas del JSONL
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string                    true  "Path del session-root actual (URL encoded)"
+// @Param        sessionID  path      string                    true  "ID de la sesión"
+// @Param        request    body      object{new_path=string}   true  "Nueva ruta absoluta del proyecto"
+// @Success      200        {object}  handlers.APIResponse{data=services.MoveSessionResult}
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      404        {object}  handlers.APIResponse
+// @Failure      409        {object}  handlers.APIResponse
+// @Failure      500        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID}/move [post]
+// @Security     BasicAuth
+func (h *SessionsHandler) Move(w http.ResponseWriter, r *http.Request) {
+	rootPath := URLParamDecoded(r, "rootPath")
+	sessionID := URLParam(r, "sessionID")
+
+	if rootPath == "" || sessionID == "" {
+		WriteBadRequest(w, "root path y session id requeridos")
+		return
+	}
+
+	var req struct {
+		NewPath string `json:"new_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteBadRequest(w, "JSON invalido")
+		return
+	}
+
+	if req.NewPath == "" {
+		WriteBadRequest(w, "new_path es requerido")
+		return
+	}
+
+	result, err := h.claude.MoveSession(rootPath, sessionID, req.NewPath)
+	if err != nil {
+		if err == os.ErrInvalid {
+			WriteBadRequest(w, "new_path debe ser una ruta absoluta")
+			return
+		}
+		if err == os.ErrExist {
+			WriteConflict(w, "la sesion ya esta en ese directorio")
+			return
+		}
+		if os.IsNotExist(err) {
+			WriteNotFound(w, "sesion")
+			return
+		}
+		WriteInternalError(w, err.Error())
+		return
+	}
+
+	// Invalidar cache de analytics para ambos proyectos
+	h.analytics.Invalidate(result.OldProjectPath)
+	h.analytics.Invalidate(result.NewProjectPath)
+
+	WriteSuccess(w, result)
 }
