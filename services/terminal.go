@@ -12,13 +12,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"claude-monitor/pkg/logger"
 
-	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
 )
 
@@ -43,7 +40,7 @@ type Terminal struct {
 	Type      string                   `json:"type"` // "claude" o "terminal"
 	StartedAt time.Time                `json:"started_at"`
 	Cmd       *exec.Cmd                `json:"-"`
-	Pty       *os.File                 `json:"-"`
+	Pty       PTY                      `json:"-"` // Interfaz PTY cross-platform
 	Clients   map[*websocket.Conn]bool `json:"-"`
 	ClientsMu sync.RWMutex             `json:"-"`
 	Config    TerminalConfig           `json:"-"`
@@ -346,14 +343,16 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	}
 	s.mu.RUnlock()
 
-	// Construir comando
+	// Construir comando (cross-platform)
 	var cmd *exec.Cmd
 	if cfg.Type == "terminal" {
-		shell := "/bin/bash"
+		shell := GetDefaultShell()
 		if cfg.Command != "" {
-			cmd = exec.Command(shell, "-c", cfg.Command)
+			args := GetShellExecArgs(cfg.Command)
+			cmd = exec.Command(shell, args...)
 		} else {
-			cmd = exec.Command(shell, "-l")
+			args := GetShellArgs()
+			cmd = exec.Command(shell, args...)
 		}
 	} else {
 		args := buildClaudeArgs(cfg)
@@ -362,8 +361,9 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 	cmd.Dir = cfg.WorkDir
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
-	// Iniciar PTY
-	ptmx, err := pty.Start(cmd)
+	// Iniciar PTY (cross-platform: Unix usa creack/pty, Windows usa ConPTY)
+	starter := NewPTYStarter()
+	ptyInstance, err := starter.Start(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("error iniciando PTY: %v", err)
 	}
@@ -377,7 +377,7 @@ func (s *TerminalService) Create(cfg TerminalConfig) (*TerminalInfo, error) {
 		Type:      cfg.Type,
 		StartedAt: time.Now(),
 		Cmd:       cmd,
-		Pty:       ptmx,
+		Pty:       ptyInstance,
 		Clients:   make(map[*websocket.Conn]bool),
 		Config:    cfg,
 		Screen:    NewScreenState(80, 24), // Pantalla virtual para tracking de estado
@@ -703,11 +703,8 @@ func (s *TerminalService) Kill(id string) error {
 		return fmt.Errorf("terminal no encontrada o no activa: %s", id)
 	}
 
-	if terminal.Cmd != nil && terminal.Cmd.Process != nil {
-		terminal.Cmd.Process.Signal(syscall.SIGTERM)
-	}
-
-	return nil
+	signaler := NewProcessSignaler()
+	return signaler.Terminate(terminal.Cmd)
 }
 
 // Delete elimina una terminal guardada
@@ -752,21 +749,9 @@ func (s *TerminalService) Resize(id string, rows, cols uint16) error {
 		return fmt.Errorf("terminal no encontrada: %s", id)
 	}
 
-	ws := struct {
-		Row    uint16
-		Col    uint16
-		Xpixel uint16
-		Ypixel uint16
-	}{Row: rows, Col: cols}
-
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		terminal.Pty.Fd(),
-		syscall.TIOCSWINSZ,
-		uintptr(unsafe.Pointer(&ws)),
-	)
-	if errno != 0 {
-		return errno
+	// Usar la interfaz PTY cross-platform para redimensionar
+	if err := terminal.Pty.Resize(cols, rows); err != nil {
+		return err
 	}
 
 	// Actualizar también el estado de pantalla virtual
@@ -1101,6 +1086,7 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 
 	// Canal para señalar terminación
 	done := make(chan string, len(ids))
+	signaler := NewProcessSignaler()
 
 	for _, id := range ids {
 		s.mu.RLock()
@@ -1122,10 +1108,10 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 		}
 		terminal.ClientsMu.RUnlock()
 
-		// Enviar SIGTERM al proceso
+		// Enviar señal de terminación al proceso (cross-platform)
 		if terminal.Cmd != nil && terminal.Cmd.Process != nil {
 			logger.Get().Terminal("shutdown", id)
-			terminal.Cmd.Process.Signal(syscall.SIGTERM)
+			signaler.Terminate(terminal.Cmd)
 
 			// Goroutine para esperar terminación de este proceso
 			go func(t *Terminal, termID string) {
@@ -1159,9 +1145,7 @@ func (s *TerminalService) ShutdownAllWithTimeout(timeout time.Duration) {
 				logger.Warn("Timeout esperando terminación, forzando kill", "remaining", remaining)
 				s.mu.RLock()
 				for _, terminal := range s.terminals {
-					if terminal.Cmd != nil && terminal.Cmd.Process != nil {
-						terminal.Cmd.Process.Kill()
-					}
+					signaler.Kill(terminal.Cmd)
 				}
 				s.mu.RUnlock()
 			}
