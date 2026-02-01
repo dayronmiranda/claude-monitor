@@ -1,3 +1,22 @@
+// @title           Claude Monitor API
+// @version         2.1.0
+// @description     API para monitorear y gestionar sesiones de Claude Code, terminales PTY, jobs y analytics.
+// @termsOfService  https://github.com/dayronmiranda/claude-monitor
+
+// @contact.name   API Support
+// @contact.url    https://github.com/dayronmiranda/claude-monitor/issues
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:9090
+// @BasePath  /api
+
+// @securityDefinitions.basic  BasicAuth
+
+// @externalDocs.description  OpenAPI
+// @externalDocs.url          https://swagger.io/resources/open-api/
+
 package main
 
 import (
@@ -15,6 +34,8 @@ import (
 	"claude-monitor/pkg/logger"
 	"claude-monitor/pkg/metrics"
 	"claude-monitor/services"
+
+	_ "claude-monitor/docs" // Swagger docs
 )
 
 const Version = "2.1.0"

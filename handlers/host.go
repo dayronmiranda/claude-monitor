@@ -87,7 +87,15 @@ func NewHostHandler(hostName, version, claudeDir string, terminals *services.Ter
 	}
 }
 
-// Get GET /api/host
+// Get godoc
+// @Summary      Obtener información del host
+// @Description  Retorna información del servidor incluyendo versión, plataforma y estadísticas
+// @Tags         host
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  handlers.APIResponse{data=handlers.HostInfo}
+// @Router       /host [get]
+// @Security     BasicAuth
 func (h *HostHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Obtener estadísticas
 	projects, _ := h.claude.ListProjects()
@@ -133,7 +141,15 @@ func (h *HostHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Health GET /api/health
+// Health godoc
+// @Summary      Health check del servicio
+// @Description  Retorna el estado de salud del servicio con checks de filesystem, memoria, goroutines y terminales
+// @Tags         host
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  handlers.HealthResponse
+// @Failure      503  {object}  handlers.HealthResponse
+// @Router       /health [get]
 func (h *HostHandler) Health(w http.ResponseWriter, r *http.Request) {
 	checks := make(map[string]HealthCheck)
 	overallStatus := HealthStatusHealthy
@@ -207,7 +223,15 @@ func (h *HostHandler) Health(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Ready GET /api/ready (para k8s readiness probe)
+// Ready godoc
+// @Summary      Readiness probe para Kubernetes
+// @Description  Verifica si el servicio está listo para recibir tráfico
+// @Tags         host
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Failure      503  {object}  map[string]string
+// @Router       /ready [get]
 func (h *HostHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	// Simple check - filesystem accessible
 	if _, err := os.Stat(h.claudeDir); err != nil {

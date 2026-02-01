@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"claude-monitor/handlers"
 	"claude-monitor/pkg/metrics"
@@ -52,11 +53,17 @@ func (r *Router) SetupRoutes() {
 	// Middleware global de Chi (recovery para evitar panics)
 	r.chi.Use(middleware.Recoverer)
 
-	// Rutas públicas (sin auth) - métricas y health
+	// Rutas públicas (sin auth) - métricas, health y swagger
 	r.chi.Group(func(router chi.Router) {
 		router.Handle("/metrics", metrics.Handler())
 		router.Get("/api/health", r.host.Health)
 		router.Get("/api/ready", r.host.Ready)
+		router.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.DeepLinking(true),
+			httpSwagger.DocExpansion("none"),
+			httpSwagger.DomID("swagger-ui"),
+		))
 	})
 
 	// Rutas de API (con middlewares)

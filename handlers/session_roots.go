@@ -22,7 +22,16 @@ func NewSessionRootsHandler(claude *services.ClaudeService, analytics *services.
 	}
 }
 
-// List GET /api/session-roots
+// List godoc
+// @Summary      Listar session-roots
+// @Description  Retorna todos los directorios donde se han ejecutado sesiones de Claude
+// @Tags         session-roots
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  handlers.APIResponse
+// @Failure      500  {object}  handlers.APIResponse
+// @Router       /session-roots [get]
+// @Security     BasicAuth
 func (h *SessionRootsHandler) List(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.claude.ListProjects()
 	if err != nil {
@@ -33,7 +42,18 @@ func (h *SessionRootsHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessWithMeta(roots, &APIMeta{Total: len(roots)}))
 }
 
-// Get GET /api/session-roots/{rootPath}
+// Get godoc
+// @Summary      Obtener session-root
+// @Description  Retorna información detallada de un session-root incluyendo estadísticas
+// @Tags         session-roots
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      404       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath} [get]
+// @Security     BasicAuth
 func (h *SessionRootsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	path := URLParamDecoded(r, "rootPath")
 	if path == "" {
@@ -76,7 +96,18 @@ func (h *SessionRootsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, response)
 }
 
-// Delete DELETE /api/session-roots/{rootPath}
+// Delete godoc
+// @Summary      Eliminar session-root
+// @Description  Elimina un session-root y todas sus sesiones
+// @Tags         session-roots
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath} [delete]
+// @Security     BasicAuth
 func (h *SessionRootsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	path := URLParamDecoded(r, "rootPath")
 	if path == "" {
@@ -95,7 +126,18 @@ func (h *SessionRootsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"message": "Session-root eliminado"})
 }
 
-// GetActivity GET /api/session-roots/{rootPath}/activity
+// GetActivity godoc
+// @Summary      Obtener actividad de session-root
+// @Description  Retorna la actividad diaria/semanal del session-root
+// @Tags         session-roots
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/activity [get]
+// @Security     BasicAuth
 func (h *SessionRootsHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 	path := URLParamDecoded(r, "rootPath")
 	if path == "" {

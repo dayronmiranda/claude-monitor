@@ -21,9 +21,19 @@ func NewJobsHandler(jobService *services.JobService) *JobsHandler {
 	}
 }
 
-// ============================================================================
-// GET /api/session-roots/{rootPath}/jobs - Lista todos los jobs
-// ============================================================================
+// ListJobs godoc
+// @Summary      Listar jobs
+// @Description  Retorna todos los jobs de un session-root, opcionalmente filtrados por estado
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true   "Path del session-root (URL encoded)"
+// @Param        state     query     string  false  "Filtrar por estado (created, starting, active, paused, stopped, archived, error)"
+// @Success      200       {object}  handlers.APIResponse{data=[]services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs [get]
+// @Security     BasicAuth
 func (h *JobsHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	if rootPath == "" {
@@ -54,9 +64,19 @@ func (h *JobsHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, jobs)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs - Crear nuevo job
-// ============================================================================
+// CreateJob godoc
+// @Summary      Crear job
+// @Description  Crea un nuevo job (trabajo de Claude o terminal)
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        request   body      object{name=string,description=string,work_dir=string,type=string,model=string,id=string}  true  "Configuración del job"
+// @Success      201       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs [post]
+// @Security     BasicAuth
 func (h *JobsHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	if rootPath == "" {
@@ -108,9 +128,19 @@ func (h *JobsHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	WriteCreated(w, job)
 }
 
-// ============================================================================
-// GET /api/session-roots/{rootPath}/jobs/{jobID} - Obtener info de un job
-// ============================================================================
+// GetJob godoc
+// @Summary      Obtener job
+// @Description  Retorna información detallada de un job
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      404       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID} [get]
+// @Security     BasicAuth
 func (h *JobsHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -127,9 +157,18 @@ func (h *JobsHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// DELETE /api/session-roots/{rootPath}/jobs/{jobID} - Eliminar un job
-// ============================================================================
+// DeleteJob godoc
+// @Summary      Eliminar job
+// @Description  Elimina un job permanentemente
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID} [delete]
+// @Security     BasicAuth
 func (h *JobsHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -145,9 +184,18 @@ func (h *JobsHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"id": jobID, "state": "deleted"})
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/start - Iniciar un job
-// ============================================================================
+// StartJob godoc
+// @Summary      Iniciar job
+// @Description  Inicia la ejecución de un job
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/start [post]
+// @Security     BasicAuth
 func (h *JobsHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -164,9 +212,18 @@ func (h *JobsHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/pause - Pausar un job
-// ============================================================================
+// PauseJob godoc
+// @Summary      Pausar job
+// @Description  Pausa la ejecución de un job activo
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/pause [post]
+// @Security     BasicAuth
 func (h *JobsHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -183,9 +240,18 @@ func (h *JobsHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/resume - Reanudar un job
-// ============================================================================
+// ResumeJob godoc
+// @Summary      Reanudar job
+// @Description  Reanuda la ejecución de un job pausado
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/resume [post]
+// @Security     BasicAuth
 func (h *JobsHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -202,9 +268,18 @@ func (h *JobsHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/stop - Detener un job
-// ============================================================================
+// StopJob godoc
+// @Summary      Detener job
+// @Description  Detiene la ejecución de un job activo o pausado
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/stop [post]
+// @Security     BasicAuth
 func (h *JobsHandler) StopJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -221,9 +296,18 @@ func (h *JobsHandler) StopJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/archive - Archivar un job
-// ============================================================================
+// ArchiveJob godoc
+// @Summary      Archivar job
+// @Description  Archiva un job detenido para ocultarlo de la lista principal
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/archive [post]
+// @Security     BasicAuth
 func (h *JobsHandler) ArchiveJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -240,9 +324,18 @@ func (h *JobsHandler) ArchiveJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/retry - Reintentar un job en ERROR
-// ============================================================================
+// RetryJob godoc
+// @Summary      Reintentar job
+// @Description  Reintenta la ejecución de un job en estado de error
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse{data=services.Job}
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/retry [post]
+// @Security     BasicAuth
 func (h *JobsHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -259,9 +352,18 @@ func (h *JobsHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, job)
 }
 
-// ============================================================================
-// POST /api/session-roots/{rootPath}/jobs/{jobID}/discard - Descartar un job en ERROR
-// ============================================================================
+// DiscardJob godoc
+// @Summary      Descartar job
+// @Description  Descarta un job en estado de error (lo elimina)
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/discard [post]
+// @Security     BasicAuth
 func (h *JobsHandler) DiscardJob(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -277,9 +379,19 @@ func (h *JobsHandler) DiscardJob(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"id": jobID, "state": "deleted"})
 }
 
-// ============================================================================
-// GET /api/session-roots/{rootPath}/jobs/{jobID}/messages - Obtener mensajes
-// ============================================================================
+// GetJobMessages godoc
+// @Summary      Obtener mensajes de job
+// @Description  Retorna los mensajes de conversación de un job
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      404       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/messages [get]
+// @Security     BasicAuth
 func (h *JobsHandler) GetJobMessages(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -305,9 +417,19 @@ func (h *JobsHandler) GetJobMessages(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, messages)
 }
 
-// ============================================================================
-// GET /api/session-roots/{rootPath}/jobs/{jobID}/actions - Obtener acciones disponibles
-// ============================================================================
+// GetJobActions godoc
+// @Summary      Obtener acciones de job
+// @Description  Retorna las acciones/transiciones válidas para el estado actual del job
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Param        jobID     path      string  true  "ID del job"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      404       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/{jobID}/actions [get]
+// @Security     BasicAuth
 func (h *JobsHandler) GetJobActions(w http.ResponseWriter, r *http.Request) {
 	jobID := URLParam(r, "jobID")
 	if jobID == "" {
@@ -330,11 +452,18 @@ func (h *JobsHandler) GetJobActions(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ============================================================================
-// BATCH OPERATIONS - Operaciones en lote
-// ============================================================================
-
-// BatchDeleteJobs POST /api/session-roots/{rootPath}/jobs/batch/delete
+// BatchDeleteJobs godoc
+// @Summary      Eliminar jobs en lote
+// @Description  Elimina múltiples jobs a la vez
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string            true  "Path del session-root (URL encoded)"
+// @Param        request   body      object{ids=[]string}  true  "IDs de jobs a eliminar"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/batch/delete [post]
+// @Security     BasicAuth
 func (h *JobsHandler) BatchDeleteJobs(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
 		IDs []string `json:"ids"`
@@ -368,7 +497,18 @@ func (h *JobsHandler) BatchDeleteJobs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BatchJobAction POST /api/session-roots/{rootPath}/jobs/batch/action
+// BatchJobAction godoc
+// @Summary      Ejecutar acción en lote
+// @Description  Ejecuta una acción (start, pause, resume, stop, archive, delete) en múltiples jobs
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string                       true  "Path del session-root (URL encoded)"
+// @Param        request   body      object{ids=[]string,action=string}  true  "IDs y acción a ejecutar"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/jobs/batch/action [post]
+// @Security     BasicAuth
 func (h *JobsHandler) BatchJobAction(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
 		IDs    []string `json:"ids"`

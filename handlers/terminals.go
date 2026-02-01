@@ -34,13 +34,33 @@ func NewTerminalsHandler(terminals *services.TerminalService, allowedPathPrefixe
 	}
 }
 
-// List GET /api/terminals
+// List godoc
+// @Summary      Listar terminales
+// @Description  Retorna lista de todas las terminales activas y guardadas
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  handlers.APIResponse
+// @Router       /terminals [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) List(w http.ResponseWriter, r *http.Request) {
 	terminals := h.terminals.List()
 	json.NewEncoder(w).Encode(SuccessWithMeta(terminals, &APIMeta{Total: len(terminals)}))
 }
 
-// Create POST /api/terminals
+// Create godoc
+// @Summary      Crear terminal
+// @Description  Crea una nueva terminal PTY (tipo claude o terminal estándar)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        request  body      services.TerminalConfig  true  "Configuración de terminal"
+// @Success      201      {object}  handlers.APIResponse{data=services.TerminalInfo}
+// @Failure      400      {object}  handlers.APIResponse
+// @Failure      409      {object}  handlers.APIResponse
+// @Failure      500      {object}  handlers.APIResponse
+// @Router       /terminals [post]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Validar request
 	req, err := validator.DecodeAndValidate(r, validator.ValidateTerminalConfig)
@@ -81,7 +101,18 @@ func (h *TerminalsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	WriteCreated(w, terminal)
 }
 
-// Get GET /api/terminals/{terminalID}
+// Get godoc
+// @Summary      Obtener terminal
+// @Description  Retorna información de una terminal específica
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse{data=services.TerminalInfo}
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID} [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -98,7 +129,17 @@ func (h *TerminalsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, terminal)
 }
 
-// Delete DELETE /api/terminals/{terminalID}
+// Delete godoc
+// @Summary      Eliminar terminal
+// @Description  Elimina una terminal guardada (no activa)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID} [delete]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -114,7 +155,18 @@ func (h *TerminalsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"message": "Terminal eliminada"})
 }
 
-// Kill POST /api/terminals/{terminalID}/kill
+// Kill godoc
+// @Summary      Matar terminal
+// @Description  Termina forzosamente una terminal activa
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/kill [post]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -130,7 +182,18 @@ func (h *TerminalsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"message": "Terminal terminada"})
 }
 
-// Resume POST /api/terminals/{terminalID}/resume
+// Resume godoc
+// @Summary      Reanudar terminal
+// @Description  Reanuda una terminal guardada
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse{data=services.TerminalInfo}
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      500         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/resume [post]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Resume(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -147,7 +210,19 @@ func (h *TerminalsHandler) Resume(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, terminal)
 }
 
-// Resize POST /api/terminals/{terminalID}/resize
+// Resize godoc
+// @Summary      Redimensionar terminal
+// @Description  Cambia el tamaño de una terminal activa
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Param        request     body      object{rows=int,cols=int}  true  "Nuevas dimensiones"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/resize [post]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Resize(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -172,7 +247,18 @@ func (h *TerminalsHandler) Resize(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"message": "Terminal redimensionada"})
 }
 
-// WebSocket GET /api/terminals/{terminalID}/ws
+// WebSocket godoc
+// @Summary      Conectar WebSocket a terminal
+// @Description  Establece conexión WebSocket para interactuar con la terminal en tiempo real
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      101         {string}  string  "Switching Protocols"
+// @Failure      400         {string}  string
+// @Failure      404         {string}  string
+// @Router       /terminals/{terminalID}/ws [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) WebSocket(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -264,7 +350,17 @@ func (h *TerminalsHandler) WebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListDir GET /api/filesystem/dir
+// ListDir godoc
+// @Summary      Listar directorio
+// @Description  Lista el contenido de un directorio del filesystem (restringido a paths permitidos)
+// @Tags         filesystem
+// @Accept       json
+// @Produce      json
+// @Param        path  query     string  false  "Path del directorio (default: /)"
+// @Success      200   {object}  handlers.APIResponse
+// @Failure      400   {object}  handlers.APIResponse
+// @Router       /filesystem/dir [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) ListDir(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
@@ -284,7 +380,18 @@ func (h *TerminalsHandler) ListDir(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
-// Snapshot GET /api/terminals/{terminalID}/snapshot
+// Snapshot godoc
+// @Summary      Obtener snapshot de terminal
+// @Description  Retorna el estado actual de la pantalla de la terminal
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/snapshot [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -301,7 +408,18 @@ func (h *TerminalsHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, snapshot)
 }
 
-// ClaudeState GET /api/terminals/{terminalID}/claude-state
+// ClaudeState godoc
+// @Summary      Obtener estado de Claude
+// @Description  Retorna el estado actual del agente Claude en la terminal (solo terminales tipo claude)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  handlers.APIResponse
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/claude-state [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -318,7 +436,18 @@ func (h *TerminalsHandler) ClaudeState(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, state)
 }
 
-// ClaudeCheckpoints GET /api/terminals/{terminalID}/checkpoints
+// ClaudeCheckpoints godoc
+// @Summary      Obtener checkpoints de Claude
+// @Description  Retorna los checkpoints/puntos de control del agente Claude
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  map[string]interface{}
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/checkpoints [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {
@@ -335,7 +464,18 @@ func (h *TerminalsHandler) ClaudeCheckpoints(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(SuccessWithMeta(checkpoints, &APIMeta{Total: len(checkpoints)}))
 }
 
-// ClaudeEvents GET /api/terminals/{terminalID}/events
+// ClaudeEvents godoc
+// @Summary      Obtener eventos de Claude
+// @Description  Retorna los eventos del agente Claude (tool calls, respuestas, etc.)
+// @Tags         terminals
+// @Accept       json
+// @Produce      json
+// @Param        terminalID  path      string  true  "ID de la terminal"
+// @Success      200         {object}  map[string]interface{}
+// @Failure      400         {object}  handlers.APIResponse
+// @Failure      404         {object}  handlers.APIResponse
+// @Router       /terminals/{terminalID}/events [get]
+// @Security     BasicAuth
 func (h *TerminalsHandler) ClaudeEvents(w http.ResponseWriter, r *http.Request) {
 	id := URLParam(r, "terminalID")
 	if id == "" {

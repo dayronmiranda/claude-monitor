@@ -24,7 +24,18 @@ func NewSessionsHandler(claude *services.ClaudeService, terminals *services.Term
 	}
 }
 
-// List GET /api/session-roots/{rootPath}/sessions
+// List godoc
+// @Summary      Listar sesiones
+// @Description  Retorna todas las sesiones de Claude en un session-root
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions [get]
+// @Security     BasicAuth
 func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
 	path := URLParamDecoded(r, "rootPath")
 	if path == "" {
@@ -41,7 +52,19 @@ func (h *SessionsHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessWithMeta(sessions, &APIMeta{Total: len(sessions)}))
 }
 
-// Get GET /api/session-roots/{rootPath}/sessions/{sessionID}
+// Get godoc
+// @Summary      Obtener sesión
+// @Description  Retorna información detallada de una sesión específica
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string  true  "Path del session-root (URL encoded)"
+// @Param        sessionID  path      string  true  "ID de la sesión"
+// @Success      200        {object}  handlers.APIResponse{data=services.ClaudeSession}
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      404        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID} [get]
+// @Security     BasicAuth
 func (h *SessionsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
@@ -60,7 +83,19 @@ func (h *SessionsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, session)
 }
 
-// GetMessages GET /api/session-roots/{rootPath}/sessions/{sessionID}/messages
+// GetMessages godoc
+// @Summary      Obtener mensajes de sesión
+// @Description  Retorna todos los mensajes de una sesión
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string  true  "Path del session-root (URL encoded)"
+// @Param        sessionID  path      string  true  "ID de la sesión"
+// @Success      200        {object}  map[string]interface{}
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      404        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID}/messages [get]
+// @Security     BasicAuth
 func (h *SessionsHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
@@ -79,7 +114,20 @@ func (h *SessionsHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessWithMeta(messages, &APIMeta{Total: len(messages)}))
 }
 
-// GetRealTimeMessages GET /api/session-roots/{rootPath}/sessions/{sessionID}/messages/realtime?from=N
+// GetRealTimeMessages godoc
+// @Summary      Obtener mensajes en tiempo real
+// @Description  Retorna mensajes nuevos desde una línea específica (para polling)
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string  true   "Path del session-root (URL encoded)"
+// @Param        sessionID  path      string  true   "ID de la sesión"
+// @Param        from       query     int     false  "Línea desde donde obtener mensajes (default: 0)"
+// @Success      200        {object}  map[string]interface{}
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      404        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID}/messages/realtime [get]
+// @Security     BasicAuth
 func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
@@ -106,7 +154,19 @@ func (h *SessionsHandler) GetRealTimeMessages(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(SuccessWithMeta(messages, &APIMeta{Total: len(messages)}))
 }
 
-// Delete DELETE /api/session-roots/{rootPath}/sessions/{sessionID}
+// Delete godoc
+// @Summary      Eliminar sesión
+// @Description  Elimina una sesión y sus mensajes
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string  true  "Path del session-root (URL encoded)"
+// @Param        sessionID  path      string  true  "ID de la sesión"
+// @Success      200        {object}  handlers.APIResponse
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      500        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID} [delete]
+// @Security     BasicAuth
 func (h *SessionsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")
@@ -130,7 +190,18 @@ func (h *SessionsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]string{"message": "Sesion eliminada"})
 }
 
-// DeleteMultiple POST /api/session-roots/{rootPath}/sessions/delete
+// DeleteMultiple godoc
+// @Summary      Eliminar múltiples sesiones
+// @Description  Elimina varias sesiones a la vez
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string                         true  "Path del session-root (URL encoded)"
+// @Param        request   body      object{session_ids=[]string}   true  "IDs de sesiones a eliminar"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/delete [post]
+// @Security     BasicAuth
 func (h *SessionsHandler) DeleteMultiple(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	if rootPath == "" {
@@ -159,7 +230,18 @@ func (h *SessionsHandler) DeleteMultiple(w http.ResponseWriter, r *http.Request)
 	WriteSuccess(w, map[string]interface{}{"deleted": deleted})
 }
 
-// CleanEmpty POST /api/session-roots/{rootPath}/sessions/clean
+// CleanEmpty godoc
+// @Summary      Limpiar sesiones vacías
+// @Description  Elimina todas las sesiones sin mensajes
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string  true  "Path del session-root (URL encoded)"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      500       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/clean [post]
+// @Security     BasicAuth
 func (h *SessionsHandler) CleanEmpty(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	if rootPath == "" {
@@ -179,7 +261,19 @@ func (h *SessionsHandler) CleanEmpty(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]interface{}{"deleted": deleted})
 }
 
-// Import POST /api/session-roots/{rootPath}/sessions/import
+// Import godoc
+// @Summary      Importar sesión a terminales
+// @Description  Marca una sesión para que aparezca en la lista de terminales guardadas
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath  path      string                           true  "Path del session-root (URL encoded)"
+// @Param        request   body      object{session_id=string,name=string}  true  "Datos de importación"
+// @Success      200       {object}  handlers.APIResponse
+// @Failure      400       {object}  handlers.APIResponse
+// @Failure      404       {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/import [post]
+// @Security     BasicAuth
 func (h *SessionsHandler) Import(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	if rootPath == "" {
@@ -224,7 +318,21 @@ func (h *SessionsHandler) Import(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Rename PUT /api/session-roots/{rootPath}/sessions/{sessionID}/rename
+// Rename godoc
+// @Summary      Renombrar sesión
+// @Description  Cambia el nombre personalizado de una sesión
+// @Tags         sessions
+// @Accept       json
+// @Produce      json
+// @Param        rootPath   path      string               true  "Path del session-root (URL encoded)"
+// @Param        sessionID  path      string               true  "ID de la sesión"
+// @Param        request    body      object{name=string}  true  "Nuevo nombre"
+// @Success      200        {object}  handlers.APIResponse{data=services.ClaudeSession}
+// @Failure      400        {object}  handlers.APIResponse
+// @Failure      404        {object}  handlers.APIResponse
+// @Failure      500        {object}  handlers.APIResponse
+// @Router       /session-roots/{rootPath}/sessions/{sessionID}/rename [put]
+// @Security     BasicAuth
 func (h *SessionsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	rootPath := URLParamDecoded(r, "rootPath")
 	sessionID := URLParam(r, "sessionID")

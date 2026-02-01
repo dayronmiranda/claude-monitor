@@ -1,0 +1,2073 @@
+basePath: /api
+definitions:
+  errors.APIError:
+    properties:
+      code:
+        $ref: '#/definitions/errors.ErrorCode'
+      details: {}
+      message:
+        type: string
+    type: object
+  errors.ErrorCode:
+    enum:
+    - NOT_FOUND
+    - INVALID_INPUT
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - INTERNAL_ERROR
+    - CONFLICT
+    - BAD_REQUEST
+    - PATH_NOT_ALLOWED
+    - TOO_MANY_REQUESTS
+    type: string
+    x-enum-varnames:
+    - ErrCodeNotFound
+    - ErrCodeInvalidInput
+    - ErrCodeUnauthorized
+    - ErrCodeForbidden
+    - ErrCodeInternal
+    - ErrCodeConflict
+    - ErrCodeBadRequest
+    - ErrCodePathNotAllowed
+    - ErrCodeTooManyRequests
+  handlers.APIResponse:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/errors.APIError'
+      success:
+        type: boolean
+    type: object
+  handlers.HealthCheck:
+    properties:
+      duration:
+        type: string
+      message:
+        type: string
+      status:
+        $ref: '#/definitions/handlers.HealthStatus'
+    type: object
+  handlers.HealthResponse:
+    properties:
+      checks:
+        additionalProperties:
+          $ref: '#/definitions/handlers.HealthCheck'
+        type: object
+      stats:
+        $ref: '#/definitions/handlers.HealthStats'
+      status:
+        $ref: '#/definitions/handlers.HealthStatus'
+      timestamp:
+        type: string
+      uptime:
+        type: string
+    type: object
+  handlers.HealthStats:
+    properties:
+      active_terminals:
+        type: integer
+      goroutines:
+        type: integer
+      heap_alloc_mb:
+        type: integer
+      heap_sys_mb:
+        type: integer
+      num_gc:
+        type: integer
+    type: object
+  handlers.HealthStatus:
+    enum:
+    - healthy
+    - degraded
+    - unhealthy
+    type: string
+    x-enum-varnames:
+    - HealthStatusHealthy
+    - HealthStatusDegraded
+    - HealthStatusUnhealthy
+  handlers.HostInfo:
+    properties:
+      arch:
+        type: string
+      claude_dir:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      platform:
+        type: string
+      started_at:
+        type: string
+      stats:
+        $ref: '#/definitions/handlers.HostStats'
+      uptime:
+        type: string
+      version:
+        type: string
+    type: object
+  handlers.HostStats:
+    properties:
+      active_terminals:
+        type: integer
+      total_projects:
+        type: integer
+      total_sessions:
+        type: integer
+    type: object
+  services.ClaudeSession:
+    properties:
+      assistant_messages:
+        type: integer
+      created_at:
+        type: string
+      file_path:
+        type: string
+      first_message:
+        type: string
+      id:
+        type: string
+      message_count:
+        type: integer
+      modified_at:
+        type: string
+      name:
+        type: string
+      project_path:
+        type: string
+      real_path:
+        type: string
+      size_bytes:
+        type: integer
+      user_messages:
+        type: integer
+    type: object
+  services.DailyActivity:
+    properties:
+      date:
+        type: string
+      messages:
+        type: integer
+      sessions:
+        type: integer
+    type: object
+  services.GlobalAnalytics:
+    properties:
+      active_days:
+        type: integer
+      cached_until:
+        type: string
+      daily_activity:
+        items:
+          $ref: '#/definitions/services.DailyActivity'
+        type: array
+      empty_sessions:
+        type: integer
+      last_updated:
+        type: string
+      projects_summary:
+        items:
+          $ref: '#/definitions/services.ProjectSummary'
+        type: array
+      total_assistant_messages:
+        type: integer
+      total_messages:
+        type: integer
+      total_projects:
+        type: integer
+      total_sessions:
+        type: integer
+      total_size_bytes:
+        type: integer
+      total_user_messages:
+        type: integer
+    type: object
+  services.Job:
+    properties:
+      archived_at:
+        description: Archivado
+        type: string
+      assistant_messages:
+        type: integer
+      auto_archived:
+        type: boolean
+      clients:
+        description: WebSocket clients
+        type: integer
+      created_at:
+        description: Creación
+        type: string
+      description:
+        description: Descripción opcional
+        type: string
+      error:
+        allOf:
+        - $ref: '#/definitions/services.JobError'
+        description: Error handling
+      id:
+        description: Identidad
+        type: string
+      is_archived:
+        description: Flags
+        type: boolean
+      memory_mb:
+        description: Uso memoria
+        type: integer
+      message_count:
+        description: Métricas de conversación
+        type: integer
+      model:
+        description: Modelo Claude
+        type: string
+      name:
+        description: Configuración
+        type: string
+      pause_count:
+        description: Contadores de ciclo de vida
+        type: integer
+      paused_at:
+        description: Última pausa
+        type: string
+      process_id:
+        description: PID
+        type: integer
+      project_path:
+        description: Proyecto padre
+        type: string
+      pty_id:
+        description: Recursos (si activo)
+        type: string
+      real_path:
+        description: Path decodificado
+        type: string
+      resume_count:
+        description: Cuántas reanudaciones
+        type: integer
+      session_id:
+        description: Mismo que ID (compat)
+        type: string
+      started_at:
+        description: Primera ejecución
+        type: string
+      state:
+        allOf:
+        - $ref: '#/definitions/services.JobState'
+        description: Estado
+      stopped_at:
+        description: Última parada
+        type: string
+      type:
+        description: '"claude" o "terminal"'
+        type: string
+      user_messages:
+        type: integer
+      work_dir:
+        description: Directorio de ejecución
+        type: string
+    type: object
+  services.JobError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      retry_count:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  services.JobState:
+    enum:
+    - created
+    - starting
+    - active
+    - paused
+    - stopped
+    - archived
+    - error
+    - deleted
+    type: string
+    x-enum-varnames:
+    - JobStateCreated
+    - JobStateStarting
+    - JobStateActive
+    - JobStatePaused
+    - JobStateStopped
+    - JobStateArchived
+    - JobStateError
+    - JobStateDeleted
+  services.ProjectAnalytics:
+    properties:
+      cached_until:
+        type: string
+      daily_activity:
+        items:
+          $ref: '#/definitions/services.DailyActivity'
+        type: array
+      empty_sessions:
+        type: integer
+      last_updated:
+        type: string
+      path:
+        type: string
+      real_path:
+        type: string
+      top_days:
+        items:
+          $ref: '#/definitions/services.DailyActivity'
+        type: array
+      total_assistant_messages:
+        type: integer
+      total_messages:
+        type: integer
+      total_sessions:
+        type: integer
+      total_size_bytes:
+        type: integer
+      total_user_messages:
+        type: integer
+    type: object
+  services.ProjectSummary:
+    properties:
+      assistant_messages:
+        type: integer
+      empty_sessions:
+        type: integer
+      last_activity:
+        type: string
+      messages:
+        type: integer
+      path:
+        type: string
+      real_path:
+        type: string
+      sessions:
+        type: integer
+      size_bytes:
+        type: integer
+      user_messages:
+        type: integer
+    type: object
+  services.TerminalConfig:
+    properties:
+      additional_dirs:
+        items:
+          type: string
+        type: array
+      allowed_tools:
+        items:
+          type: string
+        type: array
+      command:
+        type: string
+      continue:
+        type: boolean
+      dangerously_skip:
+        type: boolean
+      disallowed_tools:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      model:
+        type: string
+      name:
+        type: string
+      permission_mode:
+        type: string
+      resume:
+        type: boolean
+      system_prompt:
+        type: string
+      type:
+        description: '"claude" o "terminal"'
+        type: string
+      work_dir:
+        type: string
+    type: object
+  services.TerminalInfo:
+    properties:
+      active:
+        type: boolean
+      can_resume:
+        type: boolean
+      clients:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      last_access_at:
+        type: string
+      model:
+        type: string
+      name:
+        type: string
+      session_id:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+      work_dir:
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+host: localhost:9090
+info:
+  contact:
+    name: API Support
+    url: https://github.com/dayronmiranda/claude-monitor/issues
+  description: API para monitorear y gestionar sesiones de Claude Code, terminales
+    PTY, jobs y analytics.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://github.com/dayronmiranda/claude-monitor
+  title: Claude Monitor API
+  version: 2.1.0
+paths:
+  /analytics/cache:
+    get:
+      consumes:
+      - application/json
+      description: Retorna el estado actual del cache de analytics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener estado del cache
+      tags:
+      - analytics
+  /analytics/global:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estadísticas globales de todos los proyectos y sesiones
+      parameters:
+      - description: 'Forzar recálculo (default: false)'
+        in: query
+        name: refresh
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.GlobalAnalytics'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener analytics globales
+      tags:
+      - analytics
+  /analytics/invalidate:
+    post:
+      consumes:
+      - application/json
+      description: Invalida el cache de analytics para un session-root o globalmente
+      parameters:
+      - description: Session-root a invalidar (vacío = global)
+        in: body
+        name: request
+        schema:
+          properties:
+            session_root:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Invalidar cache de analytics
+      tags:
+      - analytics
+  /analytics/session-roots/{rootPath}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estadísticas detalladas de un session-root específico
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: 'Forzar recálculo (default: false)'
+        in: query
+        name: refresh
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.ProjectAnalytics'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener analytics de session-root
+      tags:
+      - analytics
+  /filesystem/dir:
+    get:
+      consumes:
+      - application/json
+      description: Lista el contenido de un directorio del filesystem (restringido
+        a paths permitidos)
+      parameters:
+      - description: 'Path del directorio (default: /)'
+        in: query
+        name: path
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Listar directorio
+      tags:
+      - filesystem
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Retorna el estado de salud del servicio con checks de filesystem,
+        memoria, goroutines y terminales
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Health check del servicio
+      tags:
+      - host
+  /host:
+    get:
+      consumes:
+      - application/json
+      description: Retorna información del servidor incluyendo versión, plataforma
+        y estadísticas
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handlers.HostInfo'
+              type: object
+      security:
+      - BasicAuth: []
+      summary: Obtener información del host
+      tags:
+      - host
+  /ready:
+    get:
+      consumes:
+      - application/json
+      description: Verifica si el servicio está listo para recibir tráfico
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Readiness probe para Kubernetes
+      tags:
+      - host
+  /session-roots:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todos los directorios donde se han ejecutado sesiones de
+        Claude
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Listar session-roots
+      tags:
+      - session-roots
+  /session-roots/{rootPath}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina un session-root y todas sus sesiones
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar session-root
+      tags:
+      - session-roots
+    get:
+      consumes:
+      - application/json
+      description: Retorna información detallada de un session-root incluyendo estadísticas
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener session-root
+      tags:
+      - session-roots
+  /session-roots/{rootPath}/activity:
+    get:
+      consumes:
+      - application/json
+      description: Retorna la actividad diaria/semanal del session-root
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener actividad de session-root
+      tags:
+      - session-roots
+  /session-roots/{rootPath}/jobs:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todos los jobs de un session-root, opcionalmente filtrados
+        por estado
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: Filtrar por estado (created, starting, active, paused, stopped,
+          archived, error)
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/services.Job'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Listar jobs
+      tags:
+      - jobs
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo job (trabajo de Claude o terminal)
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: Configuración del job
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            description:
+              type: string
+            id:
+              type: string
+            model:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+            work_dir:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Crear job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina un job permanentemente
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar job
+      tags:
+      - jobs
+    get:
+      consumes:
+      - application/json
+      description: Retorna información detallada de un job
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/actions:
+    get:
+      consumes:
+      - application/json
+      description: Retorna las acciones/transiciones válidas para el estado actual
+        del job
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener acciones de job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/archive:
+    post:
+      consumes:
+      - application/json
+      description: Archiva un job detenido para ocultarlo de la lista principal
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Archivar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/discard:
+    post:
+      consumes:
+      - application/json
+      description: Descarta un job en estado de error (lo elimina)
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Descartar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/messages:
+    get:
+      consumes:
+      - application/json
+      description: Retorna los mensajes de conversación de un job
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener mensajes de job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/pause:
+    post:
+      consumes:
+      - application/json
+      description: Pausa la ejecución de un job activo
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Pausar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/resume:
+    post:
+      consumes:
+      - application/json
+      description: Reanuda la ejecución de un job pausado
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Reanudar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/retry:
+    post:
+      consumes:
+      - application/json
+      description: Reintenta la ejecución de un job en estado de error
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Reintentar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/start:
+    post:
+      consumes:
+      - application/json
+      description: Inicia la ejecución de un job
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Iniciar job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/{jobID}/stop:
+    post:
+      consumes:
+      - application/json
+      description: Detiene la ejecución de un job activo o pausado
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID del job
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.Job'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Detener job
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/batch/action:
+    post:
+      consumes:
+      - application/json
+      description: Ejecuta una acción (start, pause, resume, stop, archive, delete)
+        en múltiples jobs
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: IDs y acción a ejecutar
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            action:
+              type: string
+            ids:
+              items:
+                type: string
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Ejecutar acción en lote
+      tags:
+      - jobs
+  /session-roots/{rootPath}/jobs/batch/delete:
+    post:
+      consumes:
+      - application/json
+      description: Elimina múltiples jobs a la vez
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: IDs de jobs a eliminar
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            ids:
+              items:
+                type: string
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar jobs en lote
+      tags:
+      - jobs
+  /session-roots/{rootPath}/sessions:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas las sesiones de Claude en un session-root
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Listar sesiones
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/{sessionID}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina una sesión y sus mensajes
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar sesión
+      tags:
+      - sessions
+    get:
+      consumes:
+      - application/json
+      description: Retorna información detallada de una sesión específica
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.ClaudeSession'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener sesión
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/{sessionID}/messages:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todos los mensajes de una sesión
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener mensajes de sesión
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/{sessionID}/messages/realtime:
+    get:
+      consumes:
+      - application/json
+      description: Retorna mensajes nuevos desde una línea específica (para polling)
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      - description: 'Línea desde donde obtener mensajes (default: 0)'
+        in: query
+        name: from
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener mensajes en tiempo real
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/{sessionID}/rename:
+    put:
+      consumes:
+      - application/json
+      description: Cambia el nombre personalizado de una sesión
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: ID de la sesión
+        in: path
+        name: sessionID
+        required: true
+        type: string
+      - description: Nuevo nombre
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.ClaudeSession'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Renombrar sesión
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/clean:
+    post:
+      consumes:
+      - application/json
+      description: Elimina todas las sesiones sin mensajes
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Limpiar sesiones vacías
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/delete:
+    post:
+      consumes:
+      - application/json
+      description: Elimina varias sesiones a la vez
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: IDs de sesiones a eliminar
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            session_ids:
+              items:
+                type: string
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar múltiples sesiones
+      tags:
+      - sessions
+  /session-roots/{rootPath}/sessions/import:
+    post:
+      consumes:
+      - application/json
+      description: Marca una sesión para que aparezca en la lista de terminales guardadas
+      parameters:
+      - description: Path del session-root (URL encoded)
+        in: path
+        name: rootPath
+        required: true
+        type: string
+      - description: Datos de importación
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            name:
+              type: string
+            session_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Importar sesión a terminales
+      tags:
+      - sessions
+  /terminals:
+    get:
+      consumes:
+      - application/json
+      description: Retorna lista de todas las terminales activas y guardadas
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Listar terminales
+      tags:
+      - terminals
+    post:
+      consumes:
+      - application/json
+      description: Crea una nueva terminal PTY (tipo claude o terminal estándar)
+      parameters:
+      - description: Configuración de terminal
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.TerminalConfig'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.TerminalInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Crear terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina una terminal guardada (no activa)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Eliminar terminal
+      tags:
+      - terminals
+    get:
+      consumes:
+      - application/json
+      description: Retorna información de una terminal específica
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.TerminalInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/checkpoints:
+    get:
+      consumes:
+      - application/json
+      description: Retorna los checkpoints/puntos de control del agente Claude
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener checkpoints de Claude
+      tags:
+      - terminals
+  /terminals/{terminalID}/claude-state:
+    get:
+      consumes:
+      - application/json
+      description: Retorna el estado actual del agente Claude en la terminal (solo
+        terminales tipo claude)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener estado de Claude
+      tags:
+      - terminals
+  /terminals/{terminalID}/events:
+    get:
+      consumes:
+      - application/json
+      description: Retorna los eventos del agente Claude (tool calls, respuestas,
+        etc.)
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener eventos de Claude
+      tags:
+      - terminals
+  /terminals/{terminalID}/kill:
+    post:
+      consumes:
+      - application/json
+      description: Termina forzosamente una terminal activa
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Matar terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/resize:
+    post:
+      consumes:
+      - application/json
+      description: Cambia el tamaño de una terminal activa
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      - description: Nuevas dimensiones
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            cols:
+              type: integer
+            rows:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Redimensionar terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/resume:
+    post:
+      consumes:
+      - application/json
+      description: Reanuda una terminal guardada
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handlers.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.TerminalInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Reanudar terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/snapshot:
+    get:
+      consumes:
+      - application/json
+      description: Retorna el estado actual de la pantalla de la terminal
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.APIResponse'
+      security:
+      - BasicAuth: []
+      summary: Obtener snapshot de terminal
+      tags:
+      - terminals
+  /terminals/{terminalID}/ws:
+    get:
+      consumes:
+      - application/json
+      description: Establece conexión WebSocket para interactuar con la terminal en
+        tiempo real
+      parameters:
+      - description: ID de la terminal
+        in: path
+        name: terminalID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Conectar WebSocket a terminal
+      tags:
+      - terminals
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"
